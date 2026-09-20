@@ -213,9 +213,6 @@ st.markdown(
         box-shadow: 0 2px 4px 0 rgba(30, 58, 138, 0.2);
     }
 
-    /* ======================================================== */
-    /* PENGATURAN CETAK / PDF AGAR RAPI DAN TIDAK BERANTAKAN      */
-    /* ======================================================== */
     @media print {
         section[data-testid="stSidebar"] {
             display: none !important;
@@ -245,7 +242,7 @@ st.markdown(
 
 
 # ============================================================
-# DATA LOADING & PREPROCESSING (CACHED FOR PERFORMANCE)
+# DATA LOADING & PREPROCESSING (PURE ID KASUS FINAL & GROUPING)
 # ============================================================
 
 DATA_FOLDER = "data"
@@ -266,7 +263,14 @@ def find_excel_file():
 
 @st.cache_data(show_spinner=False)
 def load_and_process_data(file_path):
+    # Memuat sheet JKK_CLEANING
     df = pd.read_excel(file_path, sheet_name="JKK_CLEANING")
+    
+    # Memuat sheet GROUPING untuk tab Kanwil & Cabang
+    try:
+        df_grouping = pd.read_excel(file_path, sheet_name="GROUPING")
+    except Exception:
+        df_grouping = pd.DataFrame()
     
     def get_col(df_obj, target_names):
         cols_map = {str(col).strip().lower(): col for col in df_obj.columns}
@@ -292,7 +296,7 @@ def load_and_process_data(file_path):
     if "ID Kasus Final" in df.columns:
         df = df[df["ID Kasus Final"].notna()].copy()
 
-    # Normalisasi Jenis Kelamin agar L dan P terbaca utuh Laki-laki / Perempuan
+    # Normalisasi Jenis Kelamin
     if "Jenis Kelamin" in df.columns:
         df["Jenis Kelamin"] = df["Jenis Kelamin"].astype(str).str.strip().replace({
             "L": "Laki-laki",
@@ -323,23 +327,22 @@ def load_and_process_data(file_path):
         case_cols.append(jam_col_name)
 
     available_case_cols = [col for col in case_cols if col in df.columns]
-    agg_dict = {col: "first" for col in available_case_cols if col != "ID Kasus Final"}
+    
+    # Cleansing & Agregasi Murni Berdasarkan ID Kasus Final
+    groupby_keys = ["ID Kasus Final"]
+
+    agg_dict = {col: "first" for col in available_case_cols if col not in groupby_keys}
     if "nom_manfaat_netto" in df.columns:
         agg_dict["nom_manfaat_netto"] = "sum"
 
-    cases_df = df.groupby("ID Kasus Final", as_index=False).agg(agg_dict)
+    cases_df = df.groupby(groupby_keys, as_index=False).agg(agg_dict)
 
     if "tgl_kejadian" in cases_df.columns:
         cases_df["Tahun"] = cases_df["tgl_kejadian"].dt.year
         cases_df["Bulan"] = cases_df["tgl_kejadian"].dt.month
         cases_df["Nama Bulan"] = cases_df["tgl_kejadian"].dt.strftime("%b")
 
-    # =========================================================================
-    # LOGIKA PEMBERSIHAN DATA USIA:
-    # Hanya nilai usia yang berada di dalam rentang valid 18 - 100 tahun yang akan 
-    # dikelompokkan ke kategori usia. Di luar rentang 18 - 100 tahun, atau jika 
-    # data tidak valid/kosong, akan otomatis dikategorikan sebagai "Tidak Diketahui".
-    # =========================================================================
+    # Pembersihan Data Usia
     if range_usia_col_name and range_usia_col_name in cases_df.columns:
         numeric_age = pd.to_numeric(cases_df[range_usia_col_name], errors="coerce")
         
@@ -372,7 +375,31 @@ def load_and_process_data(file_path):
     else:
         cases_df["Range Usia"] = "Tidak Diketahui"
 
-    return cases_df, jam_col_name
+    # Proses Standarisasi Kolom pada Sheet GROUPING jika tersedia
+    if not df_grouping.empty:
+        # Menyesuaikan nama kolom agar seragam (case-insensitive & strip)
+        df_grouping.columns = [str(c).strip() for c in df_grouping.columns]
+        
+        # Mapping nama kolom jika ada variasi penamaan di excel
+        col_map_group = {}
+        for c in df_grouping.columns:
+            c_low = c.lower()
+            if "kanwil" in c_low:
+                col_map_group[c] = "Nama Kanwil Pelayanan"
+            elif "cabang" in c_low or "kantor" in c_low:
+                col_map_group[c] = "Nama Kantor Pelayanan (Cabang)"
+            elif "jumlah" in c_low and "kasus" in c_low:
+                col_map_group[c] = "Jumlah_Kasus"
+            elif "nominal" in c_low or "manfaat" in c_low:
+                col_map_group[c] = "Total_Nominal"
+        df_grouping = df_grouping.rename(columns=col_map_group)
+
+        if "Jumlah_Kasus" in df_grouping.columns:
+            df_grouping["Jumlah_Kasus"] = pd.to_numeric(df_grouping["Jumlah_Kasus"], errors="coerce").fillna(0)
+        if "Total_Nominal" in df_grouping.columns:
+            df_grouping["Total_Nominal"] = pd.to_numeric(df_grouping["Total_Nominal"], errors="coerce").fillna(0)
+
+    return cases_df, df_grouping, jam_col_name
 
 
 file_path = find_excel_file()
@@ -382,7 +409,7 @@ if file_path is None:
 
 try:
     with st.spinner("Memuat dan memproses data..."):
-        cases, jam_col = load_and_process_data(file_path)
+        cases, df_grouping, jam_col = load_and_process_data(file_path)
 except Exception as e:
     st.error(f"Gagal membaca file Excel: {e}")
     st.stop()
@@ -398,25 +425,37 @@ st.sidebar.markdown("---")
 years = sorted(cases["Tahun"].dropna().unique().tolist()) if "Tahun" in cases.columns else []
 selected_year = st.sidebar.multiselect("Tahun", options=years, default=years)
 
-kanwil_options = sorted(
-    cases["Nama Kanwil Pelayanan"].dropna().astype(str).unique()
-) if "Nama Kanwil Pelayanan" in cases.columns else []
+# Mengambil opsi filter Kanwil dari sheet GROUPING jika ada, jika tidak fallback ke cases
+if not df_grouping.empty and "Nama Kanwil Pelayanan" in df_grouping.columns:
+    kanwil_options = sorted(df_grouping["Nama Kanwil Pelayanan"].dropna().astype(str).unique())
+else:
+    kanwil_options = sorted(cases["Nama Kanwil Pelayanan"].dropna().astype(str).unique()) if "Nama Kanwil Pelayanan" in cases.columns else []
+
 selected_kanwil = st.sidebar.multiselect(
     "Kanwil Pelayanan", options=kanwil_options, default=[]
 )
 
-filtered_for_branch = cases.copy()
-if selected_kanwil and "Nama Kanwil Pelayanan" in filtered_for_branch.columns:
-    filtered_for_branch = filtered_for_branch[
-        filtered_for_branch["Nama Kanwil Pelayanan"].isin(selected_kanwil)
-    ]
+# Filter untuk branch options berdasarkan GROUPING atau cases
+if not df_grouping.empty and "Nama Kantor Pelayanan (Cabang)" in df_grouping.columns:
+    filtered_for_branch_group = df_grouping.copy()
+    if selected_kanwil and "Nama Kanwil Pelayanan" in filtered_for_branch_group.columns:
+        filtered_for_branch_group = filtered_for_branch_group[
+            filtered_for_branch_group["Nama Kanwil Pelayanan"].isin(selected_kanwil)
+        ]
+    branch_options = sorted(filtered_for_branch_group["Nama Kantor Pelayanan (Cabang)"].dropna().astype(str).unique())
+else:
+    filtered_for_branch = cases.copy()
+    if selected_kanwil and "Nama Kanwil Pelayanan" in filtered_for_branch.columns:
+        filtered_for_branch = filtered_for_branch[
+            filtered_for_branch["Nama Kanwil Pelayanan"].isin(selected_kanwil)
+        ]
+    branch_options = sorted(
+        filtered_for_branch["Nama Kantor Pelayanan (Cabang)"]
+        .dropna()
+        .astype(str)
+        .unique()
+    ) if "Nama Kantor Pelayanan (Cabang)" in filtered_for_branch.columns else []
 
-branch_options = sorted(
-    filtered_for_branch["Nama Kantor Pelayanan (Cabang)"]
-    .dropna()
-    .astype(str)
-    .unique()
-) if "Nama Kantor Pelayanan (Cabang)" in filtered_for_branch.columns else []
 selected_branch = st.sidebar.multiselect(
     "Cabang Pelayanan", options=branch_options, default=[]
 )
@@ -511,27 +550,30 @@ chart_theme = "plotly_white"
 
 
 # ============================================================
-# TAB 1: KANWIL & CABANG
+# TAB 1: KANWIL & CABANG (SUMBER DATA GROUPING)
 # ============================================================
 
 with tab1:
-    if selected_kanwil:
-        st.markdown(f"### Analisis Kasus & Nominal Manfaat per Cabang di Kanwil: {', '.join(selected_kanwil)}")
+    # Menyiapkan data grouping yang difilter sesuai pilihan sidebar
+    if not df_grouping.empty:
+        tab1_source = df_grouping.copy()
+        if selected_kanwil and "Nama Kanwil Pelayanan" in tab1_source.columns:
+            tab1_source = tab1_source[tab1_source["Nama Kanwil Pelayanan"].isin(selected_kanwil)]
+        if selected_branch and "Nama Kantor Pelayanan (Cabang)" in tab1_source.columns:
+            tab1_source = tab1_source[tab1_source["Nama Kantor Pelayanan (Cabang)"].isin(selected_branch)]
     else:
-        st.markdown("### Analisis Kasus & Nominal Manfaat per Kanwil Pelayanan")
+        tab1_source = pd.DataFrame()
 
     if not selected_kanwil:
+        st.markdown("### Analisis Kasus & Nominal Manfaat per Kanwil Pelayanan (Data Grouping)")
         group_col = "Nama Kanwil Pelayanan"
-        if group_col in filtered.columns:
-            kanwil_summary = (
-                filtered.groupby(group_col, observed=False)
-                .agg(
-                    Jumlah_Kasus=("ID Kasus Final", "nunique"),
-                    Total_Nominal=("nom_manfaat_netto", "sum"),
-                )
-                .reset_index()
-                .sort_values("Jumlah_Kasus", ascending=False)
-            )
+        
+        if not tab1_source.empty and group_col in tab1_source.columns:
+            kanwil_summary = tab1_source.groupby(group_col, as_index=False).agg({
+                "Jumlah_Kasus": "sum",
+                "Total_Nominal": "sum"
+            })
+            kanwil_summary = kanwil_summary.sort_values("Jumlah_Kasus", ascending=False)
 
             wrapped_names = wrap_labels(kanwil_summary[group_col], width=14)
             compact_labels = [format_currency_compact_intl(n) for n in kanwil_summary["Total_Nominal"]]
@@ -628,17 +670,15 @@ with tab1:
             st.plotly_chart(fig_dual_kanwil, use_container_width=True)
 
     else:
+        st.markdown(f"### Analisis Kasus & Nominal Manfaat per Cabang di Kanwil: {', '.join(selected_kanwil)} (Data Grouping)")
         group_col = "Nama Kantor Pelayanan (Cabang)"
-        if group_col in filtered.columns:
-            branch_summary = (
-                filtered.groupby(group_col, observed=False)
-                .agg(
-                    Jumlah_Kasus=("ID Kasus Final", "nunique"),
-                    Total_Nominal=("nom_manfaat_netto", "sum"),
-                )
-                .reset_index()
-                .sort_values("Jumlah_Kasus", ascending=True)
-            )
+
+        if not tab1_source.empty and group_col in tab1_source.columns:
+            branch_summary = tab1_source.groupby([ "Nama Kanwil Pelayanan", group_col ], as_index=False).agg({
+                "Jumlah_Kasus": "sum",
+                "Total_Nominal": "sum"
+            })
+            branch_summary = branch_summary.sort_values("Jumlah_Kasus", ascending=True)
 
             branch_names = branch_summary[group_col].tolist()
             kasus_vals = branch_summary["Jumlah_Kasus"].tolist()
@@ -710,47 +750,55 @@ with tab1:
             st.plotly_chart(fig_pyramid, use_container_width=True)
 
     st.markdown("<hr style='margin: 15px 0 30px 0; border-color: #e2e8f0;'>", unsafe_allow_html=True)
-    st.markdown("### Detail Jumlah Kasus & Nominal di Masing-masing Cabang")
+    
+    if not selected_kanwil:
+        st.markdown("### Detail Jumlah Kasus, Nominal & Rata-rata di Masing-masing Kanwil (Data Grouping)")
+    else:
+        st.markdown("### Detail Jumlah Kasus, Nominal & Rata-rata di Masing-masing Cabang (Data Grouping)")
 
-    if "Nama Kanwil Pelayanan" in filtered.columns and "Nama Kantor Pelayanan (Cabang)" in filtered.columns:
-        branch_summary_table = (
-            filtered.groupby(["Nama Kanwil Pelayanan", "Nama Kantor Pelayanan (Cabang)"], observed=False)
-            .agg(
-                Jumlah_Kasus=("ID Kasus Final", "nunique"),
-                Nominal_Manfaat=("nom_manfaat_netto", "sum"),
-            )
-            .reset_index()
+    if not tab1_source.empty:
+        if not selected_kanwil:
+            summary_table = tab1_source.groupby("Nama Kanwil Pelayanan", as_index=False).agg({
+                "Jumlah_Kasus": "sum",
+                "Total_Nominal": "sum"
+            })
+            summary_table.columns = ["Nama Kanwil Pelayanan", "Jumlah_Kasus", "Nominal_Manfaat"]
+        else:
+            summary_table = tab1_source.groupby(["Nama Kanwil Pelayanan", "Nama Kantor Pelayanan (Cabang)"], as_index=False).agg({
+                "Jumlah_Kasus": "sum",
+                "Total_Nominal": "sum"
+            })
+            summary_table.columns = ["Nama Kanwil Pelayanan", "Nama Kantor Pelayanan (Cabang)", "Jumlah_Kasus", "Nominal_Manfaat"]
+            
+        # Perhitungan rata-rata dari data grouping
+        summary_table["Rata-rata Manfaat/Kasus"] = summary_table.apply(
+            lambda row: (row["Nominal_Manfaat"] / row["Jumlah_Kasus"]) if row["Jumlah_Kasus"] > 0 else 0, axis=1
         )
-        branch_summary_table["Rata-rata Manfaat/Kasus"] = (
-            branch_summary_table["Nominal_Manfaat"] / branch_summary_table["Jumlah_Kasus"]
-        )
-        branch_summary_table = branch_summary_table.sort_values("Jumlah_Kasus", ascending=False)
+        summary_table = summary_table.sort_values("Jumlah_Kasus", ascending=False)
 
-        branch_display = branch_summary_table.copy()
-        branch_display["Jumlah_Kasus"] = branch_display["Jumlah_Kasus"].apply(format_number)
-        branch_display["Nominal_Manfaat"] = branch_display["Nominal_Manfaat"].apply(format_currency)
-        branch_display["Rata-rata Manfaat/Kasus"] = branch_display["Rata-rata Manfaat/Kasus"].apply(format_currency)
+        display_tbl = summary_table.copy()
+        display_tbl["Jumlah_Kasus"] = display_tbl["Jumlah_Kasus"].apply(format_number)
+        display_tbl["Nominal_Manfaat"] = display_tbl["Nominal_Manfaat"].apply(format_currency)
+        display_tbl["Rata-rata Manfaat/Kasus"] = display_tbl["Rata-rata Manfaat/Kasus"].apply(format_currency)
 
-        st.dataframe(branch_display, use_container_width=True, hide_index=True)
+        st.dataframe(display_tbl, use_container_width=True, hide_index=True)
 
 
 # ============================================================
-# TAB 2: SEKTOR BPS (DINAMIS MENYESUAIKAN FILTER DATA)
+# TAB 2: SEKTOR BPS
 # ============================================================
 
 with tab2:
     if "Sektor BPS Final" in filtered.columns:
         st.markdown("### Top 15 Sektor BPS Berdasarkan Jumlah Kasus & Nominal Manfaat")
-        bps_data = (
-            filtered.groupby("Sektor BPS Final", observed=False)
-            .agg(
-                Jumlah_Kasus=("ID Kasus Final", "nunique"),
-                Total_Nominal=("nom_manfaat_netto", "sum"),
-            )
-            .reset_index()
-            .sort_values("Jumlah_Kasus", ascending=False)
-            .head(15)
-        )
+        bps_data = pd.pivot_table(
+            filtered,
+            index="Sektor BPS Final",
+            values=["ID Kasus Final", "nom_manfaat_netto"],
+            aggfunc={"ID Kasus Final": "nunique", "nom_manfaat_netto": "sum"}
+        ).reset_index()
+        bps_data.columns = ["Sektor BPS Final", "Jumlah_Kasus", "Total_Nominal"]
+        bps_data = bps_data.sort_values("Jumlah_Kasus", ascending=False).head(15)
 
         wrapped_sector_names = wrap_labels(bps_data["Sektor BPS Final"], width=14)
         compact_labels = [format_currency_compact_intl(n) for n in bps_data["Total_Nominal"]]
@@ -847,15 +895,15 @@ with tab2:
         st.markdown("<hr style='margin: 15px 0 30px 0; border-color: #e2e8f0;'>", unsafe_allow_html=True)
         st.markdown("### Tabel Rincian Seluruh Sektor BPS")
 
-        bps_full = (
-            filtered.groupby("Sektor BPS Final", observed=False)
-            .agg(
-                Jumlah_Kasus=("ID Kasus Final", "nunique"),
-                Total_Nominal=("nom_manfaat_netto", "sum"),
-            )
-            .reset_index()
-            .sort_values("Jumlah_Kasus", ascending=False)
-        )
+        bps_full = pd.pivot_table(
+            filtered,
+            index="Sektor BPS Final",
+            values=["ID Kasus Final", "nom_manfaat_netto"],
+            aggfunc={"ID Kasus Final": "nunique", "nom_manfaat_netto": "sum"}
+        ).reset_index()
+        bps_full.columns = ["Sektor BPS Final", "Jumlah_Kasus", "Total_Nominal"]
+        bps_full = bps_full.sort_values("Jumlah_Kasus", ascending=False)
+
         bps_display = bps_full.copy()
         bps_display["Jumlah_Kasus"] = bps_display["Jumlah_Kasus"].apply(format_number)
         bps_display["Total_Nominal"] = bps_display["Total_Nominal"].apply(format_currency)
@@ -864,20 +912,20 @@ with tab2:
 
 
 # ============================================================
-# TAB 3: PROFIL KECELAKAAN & DISTRIBUSI USIA / GENDER / FUNNEL CHART
+# TAB 3: PROFIL KECELAKAAN
 # ============================================================
 
 with tab3:
     if "Range Usia" in filtered.columns:
         st.markdown("### Persentase Distribusi Range Usia Tenaga Kerja")
         
-        age_agg = (
-            filtered.groupby("Range Usia", observed=False)
-            .agg(
-                Jumlah_Kasus=("ID Kasus Final", "nunique"),
-            )
-            .reset_index()
-        )
+        age_agg = pd.pivot_table(
+            filtered,
+            index="Range Usia",
+            values="ID Kasus Final",
+            aggfunc="nunique"
+        ).reset_index()
+        age_agg.columns = ["Range Usia", "Jumlah_Kasus"]
         
         age_order = [
             "≤ 30 Tahun",
@@ -929,7 +977,6 @@ with tab3:
             
             st.dataframe(age_display, use_container_width=True, hide_index=True)
 
-        # KETENTUAN 1: CATATAN RANGE USIA
         st.markdown(
             """
             <div style="background-color: #f8fafc; border-left: 4px solid #3b82f6; padding: 10px 15px; border-radius: 4px; font-size: 13.5px; color: #334155; margin-top: 10px; margin-bottom: 25px;">
@@ -942,14 +989,14 @@ with tab3:
         st.markdown("<hr style='margin: 30px 0; border-color: #e2e8f0;'>", unsafe_allow_html=True)
 
     if "Jenis Kelamin" in filtered.columns:
-        gender_agg = (
-            filtered.groupby("Jenis Kelamin", observed=False)
-            .agg(
-                Jumlah_Kasus=("ID Kasus Final", "nunique"),
-                Total_Nominal=("nom_manfaat_netto", "sum"),
-            )
-            .reset_index()
-        )
+        gender_agg = pd.pivot_table(
+            filtered,
+            index="Jenis Kelamin",
+            values=["ID Kasus Final", "nom_manfaat_netto"],
+            aggfunc={"ID Kasus Final": "nunique", "nom_manfaat_netto": "sum"}
+        ).reset_index()
+        gender_agg.columns = ["Jenis Kelamin", "Jumlah_Kasus", "Total_Nominal"]
+        
         total_g_cases = gender_agg["Jumlah_Kasus"].sum()
         gender_agg["Persentase (%)"] = (
             (gender_agg["Jumlah_Kasus"] / total_g_cases * 100).round(2) if total_g_cases > 0 else 0
@@ -995,11 +1042,14 @@ with tab3:
 
     with col1:
         if jam_col and jam_col in filtered.columns:
-            hour_data = (
-                filtered.groupby(jam_col, observed=False)
-                .agg(Jumlah_Kasus=("ID Kasus Final", "nunique"))
-                .reset_index()
-            )
+            hour_data = pd.pivot_table(
+                filtered,
+                index=jam_col,
+                values="ID Kasus Final",
+                aggfunc="nunique"
+            ).reset_index()
+            hour_data.columns = [jam_col, "Jumlah_Kasus"]
+            
             fig = px.area(
                 hour_data,
                 x=jam_col,
@@ -1019,12 +1069,14 @@ with tab3:
 
     with col2:
         if "Nama Lokasi Kecelakaan Final" in filtered.columns:
-            location_data = (
-                filtered.groupby("Nama Lokasi Kecelakaan Final", observed=False)
-                .agg(Jumlah_Kasus=("ID Kasus Final", "nunique"))
-                .reset_index()
-                .sort_values("Jumlah_Kasus", ascending=False)
-            )
+            location_data = pd.pivot_table(
+                filtered,
+                index="Nama Lokasi Kecelakaan Final",
+                values="ID Kasus Final",
+                aggfunc="nunique"
+            ).reset_index()
+            location_data.columns = ["Nama Lokasi Kecelakaan Final", "Jumlah_Kasus"]
+            location_data = location_data.sort_values("Jumlah_Kasus", ascending=False)
             
             location_data["Formatted_Cases"] = location_data["Jumlah_Kasus"].apply(format_number)
 
@@ -1047,10 +1099,10 @@ with tab3:
             fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
             st.plotly_chart(fig, use_container_width=True)
 
-            # KETENTUAN 3: KOTAK WARNA PENANDA LOKUS KECELAKAAN
             st.markdown(
                 """
                 <div style="display: flex; flex-wrap: wrap; gap: 12px; font-size: 12.5px; color: #334155; margin-top: -10px; margin-bottom: 20px; align-items: center;">
+                    <b>Keterangan Warna Lokus:</b>
                     <span style="display:inline-flex; align-items:center; gap:5px;"><span style="width:14px; height:14px; background-color:#93c5fd; display:inline-block; border-radius:3px;"></span> Dalam lingkungan kerja</span>
                     <span style="display:inline-flex; align-items:center; gap:5px;"><span style="width:14px; height:14px; background-color:#86efac; display:inline-block; border-radius:3px;"></span> Lalu lintas</span>
                     <span style="display:inline-flex; align-items:center; gap:5px;"><span style="width:14px; height:14px; background-color:#fef08a; display:inline-block; border-radius:3px;"></span> Luar lingkungan kerja</span>
@@ -1067,13 +1119,14 @@ with tab3:
 
     with col1:
         if "Nama Sumber Cedera Final" in filtered.columns:
-            source_data = (
-                filtered.groupby("Nama Sumber Cedera Final", observed=False)
-                .agg(Jumlah_Kasus=("ID Kasus Final", "nunique"))
-                .reset_index()
-                .sort_values("Jumlah_Kasus", ascending=False)
-                .head(10)
-            )
+            source_data = pd.pivot_table(
+                filtered,
+                index="Nama Sumber Cedera Final",
+                values="ID Kasus Final",
+                aggfunc="nunique"
+            ).reset_index()
+            source_data.columns = ["Nama Sumber Cedera Final", "Jumlah_Kasus"]
+            source_data = source_data.sort_values("Jumlah_Kasus", ascending=False).head(10)
             source_data = source_data.sort_values("Jumlah_Kasus", ascending=True)
 
             fig = px.bar(
@@ -1095,13 +1148,14 @@ with tab3:
 
     with col2:
         if "Nama Bagian Sakit Final" in filtered.columns:
-            body_data = (
-                filtered.groupby("Nama Bagian Sakit Final", observed=False)
-                .agg(Jumlah_Kasus=("ID Kasus Final", "nunique"))
-                .reset_index()
-                .sort_values("Jumlah_Kasus", ascending=False)
-                .head(10)
-            )
+            body_data = pd.pivot_table(
+                filtered,
+                index="Nama Bagian Sakit Final",
+                values="ID Kasus Final",
+                aggfunc="nunique"
+            ).reset_index()
+            body_data.columns = ["Nama Bagian Sakit Final", "Jumlah_Kasus"]
+            body_data = body_data.sort_values("Jumlah_Kasus", ascending=False).head(10)
             body_data = body_data.sort_values("Jumlah_Kasus", ascending=True)
 
             fig = px.bar(
@@ -1124,12 +1178,15 @@ with tab3:
     if "Kondisi Akhir" in filtered.columns:
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("### Distribusi Kondisi Akhir Pekerja (Funnel Chart)")
-        cond_data = (
-            filtered.groupby("Kondisi Akhir", observed=False)
-            .agg(Jumlah_Kasus=("ID Kasus Final", "nunique"))
-            .reset_index()
-            .sort_values("Jumlah_Kasus", ascending=False)
-        )
+        
+        cond_data = pd.pivot_table(
+            filtered,
+            index="Kondisi Akhir",
+            values="ID Kasus Final",
+            aggfunc="nunique"
+        ).reset_index()
+        cond_data.columns = ["Kondisi Akhir", "Jumlah_Kasus"]
+        cond_data = cond_data.sort_values("Jumlah_Kasus", ascending=False)
         
         total_cond = cond_data["Jumlah_Kasus"].sum()
         cond_data["Persen"] = (cond_data["Jumlah_Kasus"] / total_cond * 100).round(1) if total_cond > 0 else 0
