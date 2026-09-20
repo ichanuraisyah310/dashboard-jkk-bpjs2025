@@ -565,7 +565,7 @@ with tab1:
         tab1_source = pd.DataFrame()
 
     if not selected_kanwil:
-        st.markdown("### Analisis Kasus & Nominal Manfaat per Kanwil Pelayanan (Data Grouping)")
+        st.markdown("### Analisis Kasus & Nominal Manfaat per Kanwil Pelayanan")
         group_col = "Nama Kanwil Pelayanan"
         
         if not tab1_source.empty and group_col in tab1_source.columns:
@@ -1102,7 +1102,7 @@ with tab3:
             st.markdown(
                 """
                 <div style="display: flex; flex-wrap: wrap; gap: 12px; font-size: 12.5px; color: #334155; margin-top: -10px; margin-bottom: 20px; align-items: center;">
-                    <b>Keterangan Warna Lokus:</b>
+                    <b></b>
                     <span style="display:inline-flex; align-items:center; gap:5px;"><span style="width:14px; height:14px; background-color:#93c5fd; display:inline-block; border-radius:3px;"></span> Dalam lingkungan kerja</span>
                     <span style="display:inline-flex; align-items:center; gap:5px;"><span style="width:14px; height:14px; background-color:#86efac; display:inline-block; border-radius:3px;"></span> Lalu lintas</span>
                     <span style="display:inline-flex; align-items:center; gap:5px;"><span style="width:14px; height:14px; background-color:#fef08a; display:inline-block; border-radius:3px;"></span> Luar lingkungan kerja</span>
