@@ -263,10 +263,8 @@ def find_excel_file():
 
 @st.cache_data(show_spinner=False)
 def load_and_process_data(file_path):
-    # Memuat sheet JKK_CLEANING
     df = pd.read_excel(file_path, sheet_name="JKK_CLEANING")
     
-    # Memuat sheet GROUPING untuk tab Kanwil & Cabang
     try:
         df_grouping = pd.read_excel(file_path, sheet_name="GROUPING")
     except Exception:
@@ -296,7 +294,6 @@ def load_and_process_data(file_path):
     if "ID Kasus Final" in df.columns:
         df = df[df["ID Kasus Final"].notna()].copy()
 
-    # Normalisasi Jenis Kelamin
     if "Jenis Kelamin" in df.columns:
         df["Jenis Kelamin"] = df["Jenis Kelamin"].astype(str).str.strip().replace({
             "L": "Laki-laki",
@@ -328,7 +325,6 @@ def load_and_process_data(file_path):
 
     available_case_cols = [col for col in case_cols if col in df.columns]
     
-    # Cleansing & Agregasi Murni Berdasarkan ID Kasus Final
     groupby_keys = ["ID Kasus Final"]
 
     agg_dict = {col: "first" for col in available_case_cols if col not in groupby_keys}
@@ -342,7 +338,6 @@ def load_and_process_data(file_path):
         cases_df["Bulan"] = cases_df["tgl_kejadian"].dt.month
         cases_df["Nama Bulan"] = cases_df["tgl_kejadian"].dt.strftime("%b")
 
-    # Pembersihan Data Usia
     if range_usia_col_name and range_usia_col_name in cases_df.columns:
         numeric_age = pd.to_numeric(cases_df[range_usia_col_name], errors="coerce")
         
@@ -375,12 +370,9 @@ def load_and_process_data(file_path):
     else:
         cases_df["Range Usia"] = "Tidak Diketahui"
 
-    # Proses Standarisasi Kolom pada Sheet GROUPING jika tersedia
     if not df_grouping.empty:
-        # Menyesuaikan nama kolom agar seragam (case-insensitive & strip)
         df_grouping.columns = [str(c).strip() for c in df_grouping.columns]
         
-        # Mapping nama kolom jika ada variasi penamaan di excel
         col_map_group = {}
         for c in df_grouping.columns:
             c_low = c.lower()
@@ -425,7 +417,6 @@ st.sidebar.markdown("---")
 years = sorted(cases["Tahun"].dropna().unique().tolist()) if "Tahun" in cases.columns else []
 selected_year = st.sidebar.multiselect("Tahun", options=years, default=years)
 
-# Mengambil opsi filter Kanwil dari sheet GROUPING jika ada, jika tidak fallback ke cases
 if not df_grouping.empty and "Nama Kanwil Pelayanan" in df_grouping.columns:
     kanwil_options = sorted(df_grouping["Nama Kanwil Pelayanan"].dropna().astype(str).unique())
 else:
@@ -435,7 +426,6 @@ selected_kanwil = st.sidebar.multiselect(
     "Kanwil Pelayanan", options=kanwil_options, default=[]
 )
 
-# Filter untuk branch options berdasarkan GROUPING atau cases
 if not df_grouping.empty and "Nama Kantor Pelayanan (Cabang)" in df_grouping.columns:
     filtered_for_branch_group = df_grouping.copy()
     if selected_kanwil and "Nama Kanwil Pelayanan" in filtered_for_branch_group.columns:
@@ -554,7 +544,6 @@ chart_theme = "plotly_white"
 # ============================================================
 
 with tab1:
-    # Menyiapkan data grouping yang difilter sesuai pilihan sidebar
     if not df_grouping.empty:
         tab1_source = df_grouping.copy()
         if selected_kanwil and "Nama Kanwil Pelayanan" in tab1_source.columns:
@@ -770,7 +759,6 @@ with tab1:
             })
             summary_table.columns = ["Nama Kanwil Pelayanan", "Nama Kantor Pelayanan (Cabang)", "Jumlah_Kasus", "Nominal_Manfaat"]
             
-        # Perhitungan rata-rata dari data grouping
         summary_table["Rata-rata Manfaat/Kasus"] = summary_table.apply(
             lambda row: (row["Nominal_Manfaat"] / row["Jumlah_Kasus"]) if row["Jumlah_Kasus"] > 0 else 0, axis=1
         )
@@ -797,118 +785,122 @@ with tab2:
             values=["ID Kasus Final", "nom_manfaat_netto"],
             aggfunc={"ID Kasus Final": "nunique", "nom_manfaat_netto": "sum"}
         ).reset_index()
-        bps_data.columns = ["Sektor BPS Final", "Jumlah_Kasus", "Total_Nominal"]
-        bps_data = bps_data.sort_values("Jumlah_Kasus", ascending=False).head(15)
-
-        wrapped_sector_names = wrap_labels(bps_data["Sektor BPS Final"], width=14)
-        compact_labels = [format_currency_compact_intl(n) for n in bps_data["Total_Nominal"]]
-        formatted_hover_nominal = [format_currency(val) for val in bps_data["Total_Nominal"]]
-
-        bar_fonts = [9.5 for _ in range(len(bps_data))]
-
-        max_case_bps = bps_data["Jumlah_Kasus"].max() if not bps_data["Jumlah_Kasus"].empty else 10
         
-        if max_case_bps <= 50:
-            suggested_max_y_bps = 100
-            dynamic_dtick_bps = 20
-        else:
-            suggested_max_y_bps = max_case_bps * 1.1
-            if max_case_bps > 20000:
-                dynamic_dtick_bps = 5000
-            elif max_case_bps > 5000:
-                dynamic_dtick_bps = 2000
-            elif max_case_bps > 1000:
-                dynamic_dtick_bps = 500
-            elif max_case_bps > 200:
-                dynamic_dtick_bps = 100
-            else:
+        if not bps_data.empty:
+            bps_data.columns = ["Sektor BPS Final", "Jumlah_Kasus", "Total_Nominal"]
+            bps_data = bps_data.sort_values("Jumlah_Kasus", ascending=False).head(15)
+
+            wrapped_sector_names = wrap_labels(bps_data["Sektor BPS Final"], width=14)
+            compact_labels = [format_currency_compact_intl(n) for n in bps_data["Total_Nominal"]]
+            formatted_hover_nominal = [format_currency(val) for val in bps_data["Total_Nominal"]]
+
+            bar_fonts = [9.5 for _ in range(len(bps_data))]
+
+            max_case_bps = bps_data["Jumlah_Kasus"].max() if not bps_data["Jumlah_Kasus"].empty else 10
+            
+            if max_case_bps <= 50:
+                suggested_max_y_bps = 100
                 dynamic_dtick_bps = 20
+            else:
+                suggested_max_y_bps = max_case_bps * 1.1
+                if max_case_bps > 20000:
+                    dynamic_dtick_bps = 5000
+                elif max_case_bps > 5000:
+                    dynamic_dtick_bps = 2000
+                elif max_case_bps > 1000:
+                    dynamic_dtick_bps = 500
+                elif max_case_bps > 200:
+                    dynamic_dtick_bps = 100
+                else:
+                    dynamic_dtick_bps = 20
 
-        max_nominal_val = bps_data["Total_Nominal"].max() if not bps_data["Total_Nominal"].empty else 100
-        suggested_max_y2 = max_nominal_val * 1.1
+            max_nominal_val = bps_data["Total_Nominal"].max() if not bps_data["Total_Nominal"].empty else 100
+            suggested_max_y2 = max_nominal_val * 1.1
 
-        fig_dual = go.Figure()
+            fig_dual = go.Figure()
 
-        fig_dual.add_trace(go.Bar(
-            x=wrapped_sector_names,
-            y=bps_data["Jumlah_Kasus"],
-            name="Jumlah Kasus",
-            marker=dict(color="#60a5fa", opacity=0.9),
-            text=[f"{format_number(c)} kasus" for c in bps_data["Jumlah_Kasus"]],
-            textposition="inside",
-            insidetextanchor="start",
-            textfont=dict(size=bar_fonts, color="#1e3a8a", family="Inter, sans-serif"),
-            customdata=bps_data["Sektor BPS Final"],
-            hovertemplate="Sektor: <b>%{customdata}</b><br>Jumlah Kasus: <b>%{y:,} kasus</b><extra></extra>",
-            yaxis="y"
-        ))
+            fig_dual.add_trace(go.Bar(
+                x=wrapped_sector_names,
+                y=bps_data["Jumlah_Kasus"],
+                name="Jumlah Kasus",
+                marker=dict(color="#60a5fa", opacity=0.9),
+                text=[f"{format_number(c)} kasus" for c in bps_data["Jumlah_Kasus"]],
+                textposition="inside",
+                insidetextanchor="start",
+                textfont=dict(size=bar_fonts, color="#1e3a8a", family="Inter, sans-serif"),
+                customdata=bps_data["Sektor BPS Final"],
+                hovertemplate="Sektor: <b>%{customdata}</b><br>Jumlah Kasus: <b>%{y:,} kasus</b><extra></extra>",
+                yaxis="y"
+            ))
 
-        fig_dual.add_trace(go.Scatter(
-            x=wrapped_sector_names,
-            y=bps_data["Total_Nominal"],
-            name="Total Nominal Manfaat",
-            mode="lines+markers+text",
-            line=dict(color="#1d4ed8", width=3.5),
-            marker=dict(size=10, color="#1d4ed8", line=dict(color="#ffffff", width=2)),
-            text=compact_labels,
-            textposition="top center",
-            textfont=dict(size=10, color="#1e3a8a", family="Inter, sans-serif"),
-            customdata=np.stack([bps_data["Sektor BPS Final"], formatted_hover_nominal], axis=-1),
-            hovertemplate="Sektor: <b>%{customdata[0]}</b><br>Total Nominal Manfaat: <b>%{customdata[1]}</b><extra></extra>",
-            yaxis="y2"
-        ))
+            fig_dual.add_trace(go.Scatter(
+                x=wrapped_sector_names,
+                y=bps_data["Total_Nominal"],
+                name="Total Nominal Manfaat",
+                mode="lines+markers+text",
+                line=dict(color="#1d4ed8", width=3.5),
+                marker=dict(size=10, color="#1d4ed8", line=dict(color="#ffffff", width=2)),
+                text=compact_labels,
+                textposition="top center",
+                textfont=dict(size=10, color="#1e3a8a", family="Inter, sans-serif"),
+                customdata=np.stack([bps_data["Sektor BPS Final"], formatted_hover_nominal], axis=-1),
+                hovertemplate="Sektor: <b>%{customdata[0]}</b><br>Total Nominal Manfaat: <b>%{customdata[1]}</b><extra></extra>",
+                yaxis="y2"
+            ))
 
-        fig_dual.update_layout(
-            template=chart_theme,
-            height=880,
-            margin=dict(l=50, r=50, t=20, b=90),
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            xaxis=dict(
-                title="",
-                tickangle=0,
-                tickfont=dict(size=8.5, color="#0f172a", family="Inter, sans-serif")
-            ),
-            yaxis=dict(
-                title=dict(text="Jumlah Kasus", font=dict(color="#334155")),
-                gridcolor="#cbd5e1",
-                zeroline=True,
-                side="left",
-                rangemode="tozero",
-                range=[0, suggested_max_y_bps],
-                dtick=dynamic_dtick_bps
-            ),
-            yaxis2=dict(
-                title=dict(text="Total Nominal Manfaat (Rp)", font=dict(color="#1d4ed8")),
-                overlaying="y",
-                side="right",
-                showgrid=False,
-                zeroline=False,
-                rangemode="tozero",
-                range=[0, suggested_max_y2]
-            ),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-        )
+            fig_dual.update_layout(
+                template=chart_theme,
+                height=880,
+                margin=dict(l=50, r=50, t=20, b=90),
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                xaxis=dict(
+                    title="",
+                    tickangle=0,
+                    tickfont=dict(size=8.5, color="#0f172a", family="Inter, sans-serif")
+                ),
+                yaxis=dict(
+                    title=dict(text="Jumlah Kasus", font=dict(color="#334155")),
+                    gridcolor="#cbd5e1",
+                    zeroline=True,
+                    side="left",
+                    rangemode="tozero",
+                    range=[0, suggested_max_y_bps],
+                    dtick=dynamic_dtick_bps
+                ),
+                yaxis2=dict(
+                    title=dict(text="Total Nominal Manfaat (Rp)", font=dict(color="#1d4ed8")),
+                    overlaying="y",
+                    side="right",
+                    showgrid=False,
+                    zeroline=False,
+                    rangemode="tozero",
+                    range=[0, suggested_max_y2]
+                ),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            )
 
-        st.plotly_chart(fig_dual, use_container_width=True)
+            st.plotly_chart(fig_dual, use_container_width=True)
 
-        st.markdown("<hr style='margin: 15px 0 30px 0; border-color: #e2e8f0;'>", unsafe_allow_html=True)
-        st.markdown("### Tabel Rincian Seluruh Sektor BPS")
+            st.markdown("<hr style='margin: 15px 0 30px 0; border-color: #e2e8f0;'>", unsafe_allow_html=True)
+            st.markdown("### Tabel Rincian Seluruh Sektor BPS")
 
-        bps_full = pd.pivot_table(
-            filtered,
-            index="Sektor BPS Final",
-            values=["ID Kasus Final", "nom_manfaat_netto"],
-            aggfunc={"ID Kasus Final": "nunique", "nom_manfaat_netto": "sum"}
-        ).reset_index()
-        bps_full.columns = ["Sektor BPS Final", "Jumlah_Kasus", "Total_Nominal"]
-        bps_full = bps_full.sort_values("Jumlah_Kasus", ascending=False)
+            bps_full = pd.pivot_table(
+                filtered,
+                index="Sektor BPS Final",
+                values=["ID Kasus Final", "nom_manfaat_netto"],
+                aggfunc={"ID Kasus Final": "nunique", "nom_manfaat_netto": "sum"}
+            ).reset_index()
+            bps_full.columns = ["Sektor BPS Final", "Jumlah_Kasus", "Total_Nominal"]
+            bps_full = bps_full.sort_values("Jumlah_Kasus", ascending=False)
 
-        bps_display = bps_full.copy()
-        bps_display["Jumlah_Kasus"] = bps_display["Jumlah_Kasus"].apply(format_number)
-        bps_display["Total_Nominal"] = bps_display["Total_Nominal"].apply(format_currency)
+            bps_display = bps_full.copy()
+            bps_display["Jumlah_Kasus"] = bps_display["Jumlah_Kasus"].apply(format_number)
+            bps_display["Total_Nominal"] = bps_display["Total_Nominal"].apply(format_currency)
 
-        st.dataframe(bps_display, use_container_width=True, hide_index=True)
+            st.dataframe(bps_display, use_container_width=True, hide_index=True)
+        else:
+            st.info("Tidak ada data Sektor BPS yang tersedia dengan filter yang dipilih.")
 
 
 # ============================================================
@@ -925,57 +917,59 @@ with tab3:
             values="ID Kasus Final",
             aggfunc="nunique"
         ).reset_index()
-        age_agg.columns = ["Range Usia", "Jumlah_Kasus"]
         
-        age_order = [
-            "≤ 30 Tahun",
-            "31 - 50 Tahun",
-            "≥ 51 Tahun",
-            "Tidak Diketahui"
-        ]
-        age_agg["Range Usia"] = pd.Categorical(age_agg["Range Usia"], categories=age_order, ordered=True)
-        age_agg = age_agg.sort_values("Range Usia")
-
-        total_age_cases = age_agg["Jumlah_Kasus"].sum()
-        age_agg["Persentase"] = (age_agg["Jumlah_Kasus"] / total_age_cases * 100).round(1) if total_age_cases > 0 else 0
-        
-        col_a, col_b = st.columns([1.2, 1])
-        
-        with col_a:
-            fig_pie = px.pie(
-                age_agg,
-                names="Range Usia",
-                values="Jumlah_Kasus",
-                hole=0.0,
-                color_discrete_sequence=["#db2777", "#fbbf24", "#8b5cf6", "#94a3b8"],
-                template=chart_theme
-            )
-            fig_pie.update_traces(
-                textinfo="percent+label",
-                textfont=dict(size=12, family="Inter, sans-serif"),
-                marker=dict(line=dict(color="#ffffff", width=2)),
-                customdata=np.stack([
-                    age_agg["Jumlah_Kasus"].apply(format_number),
-                    age_agg["Persentase"].astype(str)
-                ], axis=-1),
-                hovertemplate="<b>Range Usia:</b> %{label}<br><b>Jumlah Kasus:</b> %{customdata[0]} kasus<br><b>Persentase:</b> %{customdata[1]}%<extra></extra>"
-            )
-            fig_pie.update_layout(
-                paper_bgcolor='rgba(0,0,0,0)',
-                plot_bgcolor='rgba(0,0,0,0)',
-                margin=dict(t=20, b=40, l=20, r=20),
-                legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5)
-            )
-            st.plotly_chart(fig_pie, use_container_width=True)
-
-        with col_b:
-            st.markdown("##### Ringkasan Data Range Usia")
-            age_display = age_agg.copy()
-            age_display["Persentase (%)"] = age_display["Persentase"].astype(str).str.replace(".", ",") + " %"
-            age_display["Jumlah_Kasus"] = age_display["Jumlah_Kasus"].apply(format_number)
-            age_display = age_display[["Range Usia", "Jumlah_Kasus", "Persentase (%)"]]
+        if not age_agg.empty:
+            age_agg.columns = ["Range Usia", "Jumlah_Kasus"]
             
-            st.dataframe(age_display, use_container_width=True, hide_index=True)
+            age_order = [
+                "≤ 30 Tahun",
+                "31 - 50 Tahun",
+                "≥ 51 Tahun",
+                "Tidak Diketahui"
+            ]
+            age_agg["Range Usia"] = pd.Categorical(age_agg["Range Usia"], categories=age_order, ordered=True)
+            age_agg = age_agg.sort_values("Range Usia")
+
+            total_age_cases = age_agg["Jumlah_Kasus"].sum()
+            age_agg["Persentase"] = (age_agg["Jumlah_Kasus"] / total_age_cases * 100).round(1) if total_age_cases > 0 else 0
+            
+            col_a, col_b = st.columns([1.2, 1])
+            
+            with col_a:
+                fig_pie = px.pie(
+                    age_agg,
+                    names="Range Usia",
+                    values="Jumlah_Kasus",
+                    hole=0.0,
+                    color_discrete_sequence=["#db2777", "#fbbf24", "#8b5cf6", "#94a3b8"],
+                    template=chart_theme
+                )
+                fig_pie.update_traces(
+                    textinfo="percent+label",
+                    textfont=dict(size=12, family="Inter, sans-serif"),
+                    marker=dict(line=dict(color="#ffffff", width=2)),
+                    customdata=np.stack([
+                        age_agg["Jumlah_Kasus"].apply(format_number),
+                        age_agg["Persentase"].astype(str)
+                    ], axis=-1),
+                    hovertemplate="<b>Range Usia:</b> %{label}<br><b>Jumlah Kasus:</b> %{customdata[0]} kasus<br><b>Persentase:</b> %{customdata[1]}%<extra></extra>"
+                )
+                fig_pie.update_layout(
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    margin=dict(t=20, b=40, l=20, r=20),
+                    legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5)
+                )
+                st.plotly_chart(fig_pie, use_container_width=True)
+
+            with col_b:
+                st.markdown("##### Ringkasan Data Range Usia")
+                age_display = age_agg.copy()
+                age_display["Persentase (%)"] = age_display["Persentase"].astype(str).str.replace(".", ",") + " %"
+                age_display["Jumlah_Kasus"] = age_display["Jumlah_Kasus"].apply(format_number)
+                age_display = age_display[["Range Usia", "Jumlah_Kasus", "Persentase (%)"]]
+                
+                st.dataframe(age_display, use_container_width=True, hide_index=True)
 
         st.markdown(
             """
@@ -995,45 +989,47 @@ with tab3:
             values=["ID Kasus Final", "nom_manfaat_netto"],
             aggfunc={"ID Kasus Final": "nunique", "nom_manfaat_netto": "sum"}
         ).reset_index()
-        gender_agg.columns = ["Jenis Kelamin", "Jumlah_Kasus", "Total_Nominal"]
         
-        total_g_cases = gender_agg["Jumlah_Kasus"].sum()
-        gender_agg["Persentase (%)"] = (
-            (gender_agg["Jumlah_Kasus"] / total_g_cases * 100).round(2) if total_g_cases > 0 else 0
-        )
-
-        col1, col2 = st.columns([1, 1])
-
-        with col1:
-            st.markdown("### Rasio Kasus Berdasarkan Jenis Kelamin")
-            fig_gender = px.pie(
-                gender_agg,
-                names="Jenis Kelamin",
-                values="Jumlah_Kasus",
-                hole=0.45,
-                color_discrete_sequence=["#1d4ed8", "#db2777", "#64748b"],
-                template=chart_theme,
+        if not gender_agg.empty:
+            gender_agg.columns = ["Jenis Kelamin", "Jumlah_Kasus", "Total_Nominal"]
+            
+            total_g_cases = gender_agg["Jumlah_Kasus"].sum()
+            gender_agg["Persentase (%)"] = (
+                (gender_agg["Jumlah_Kasus"] / total_g_cases * 100).round(2) if total_g_cases > 0 else 0
             )
-            fig_gender.update_traces(
-                textinfo="percent+label", 
-                textfont=dict(size=13),
-                marker=dict(line=dict(color="#ffffff", width=2))
-            )
-            fig_gender.update_layout(
-                paper_bgcolor='rgba(0,0,0,0)', 
-                plot_bgcolor='rgba(0,0,0,0)',
-                margin=dict(t=20, b=20, l=20, r=20)
-            )
-            st.plotly_chart(fig_gender, use_container_width=True)
 
-        with col2:
-            gender_display = gender_agg.copy()
-            gender_display["Jumlah_Kasus"] = gender_display["Jumlah_Kasus"].apply(format_number)
-            gender_display["Total_Nominal"] = gender_display["Total_Nominal"].apply(format_currency)
-            gender_display["Persentase (%)"] = gender_display["Persentase (%)"].astype(str).str.replace(".", ",") + " %"
+            col1, col2 = st.columns([1, 1])
 
-            st.markdown("### Tabel Ringkasan Rasio Jenis Kelamin")
-            st.dataframe(gender_display, use_container_width=True, hide_index=True)
+            with col1:
+                st.markdown("### Rasio Kasus Berdasarkan Jenis Kelamin")
+                fig_gender = px.pie(
+                    gender_agg,
+                    names="Jenis Kelamin",
+                    values="Jumlah_Kasus",
+                    hole=0.45,
+                    color_discrete_sequence=["#1d4ed8", "#db2777", "#64748b"],
+                    template=chart_theme,
+                )
+                fig_gender.update_traces(
+                    textinfo="percent+label", 
+                    textfont=dict(size=13),
+                    marker=dict(line=dict(color="#ffffff", width=2))
+                )
+                fig_gender.update_layout(
+                    paper_bgcolor='rgba(0,0,0,0)', 
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    margin=dict(t=20, b=20, l=20, r=20)
+                )
+                st.plotly_chart(fig_gender, use_container_width=True)
+
+            with col2:
+                gender_display = gender_agg.copy()
+                gender_display["Jumlah_Kasus"] = gender_display["Jumlah_Kasus"].apply(format_number)
+                gender_display["Total_Nominal"] = gender_display["Total_Nominal"].apply(format_currency)
+                gender_display["Persentase (%)"] = gender_display["Persentase (%)"].astype(str).str.replace(".", ",") + " %"
+
+                st.markdown("### Tabel Ringkasan Rasio Jenis Kelamin")
+                st.dataframe(gender_display, use_container_width=True, hide_index=True)
 
     st.markdown("<hr style='margin: 30px 0; border-color: #e2e8f0;'>", unsafe_allow_html=True)
     st.markdown("### Jam Kecelakaan & Lokus Kejadian")
@@ -1048,24 +1044,26 @@ with tab3:
                 values="ID Kasus Final",
                 aggfunc="nunique"
             ).reset_index()
-            hour_data.columns = [jam_col, "Jumlah_Kasus"]
             
-            fig = px.area(
-                hour_data,
-                x=jam_col,
-                y="Jumlah_Kasus",
-                title="Distribusi Jam Kecelakaan Kerja",
-                markers=True,
-                color_discrete_sequence=["#d97706"],
-                template=chart_theme,
-            )
-            fig.update_layout(
-                xaxis_title="Waktu",
-                yaxis_title="Jumlah Kasus",
-                paper_bgcolor='rgba(0,0,0,0)',
-                plot_bgcolor='rgba(0,0,0,0)'
-            )
-            st.plotly_chart(fig, use_container_width=True)
+            if not hour_data.empty:
+                hour_data.columns = [jam_col, "Jumlah_Kasus"]
+                
+                fig = px.area(
+                    hour_data,
+                    x=jam_col,
+                    y="Jumlah_Kasus",
+                    title="Distribusi Jam Kecelakaan Kerja",
+                    markers=True,
+                    color_discrete_sequence=["#d97706"],
+                    template=chart_theme,
+                )
+                fig.update_layout(
+                    xaxis_title="Waktu",
+                    yaxis_title="Jumlah Kasus",
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)'
+                )
+                st.plotly_chart(fig, use_container_width=True)
 
     with col2:
         if "Nama Lokasi Kecelakaan Final" in filtered.columns:
@@ -1075,42 +1073,44 @@ with tab3:
                 values="ID Kasus Final",
                 aggfunc="nunique"
             ).reset_index()
-            location_data.columns = ["Nama Lokasi Kecelakaan Final", "Jumlah_Kasus"]
-            location_data = location_data.sort_values("Jumlah_Kasus", ascending=False)
             
-            location_data["Formatted_Cases"] = location_data["Jumlah_Kasus"].apply(format_number)
+            if not location_data.empty:
+                location_data.columns = ["Nama Lokasi Kecelakaan Final", "Jumlah_Kasus"]
+                location_data = location_data.sort_values("Jumlah_Kasus", ascending=False)
+                
+                location_data["Formatted_Cases"] = location_data["Jumlah_Kasus"].apply(format_number)
 
-            soft_colors = ["#93c5fd", "#86efac", "#fef08a", "#fbcfe8", "#cbd5e1"]
-            fig = px.treemap(
-                location_data,
-                path=["Nama Lokasi Kecelakaan Final"],
-                values="Jumlah_Kasus",
-                title="Distribusi Lokus Kecelakaan",
-                color="Nama Lokasi Kecelakaan Final",
-                color_discrete_sequence=soft_colors,
-                template=chart_theme,
-            )
-            
-            fig.update_traces(
-                customdata=location_data["Formatted_Cases"],
-                texttemplate="<b>%{label}</b><br><span style='font-size:11px;'>%{customdata} kasus</span>",
-                textfont=dict(size=13, color="#0f172a"),
-            )
-            fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-            st.plotly_chart(fig, use_container_width=True)
+                soft_colors = ["#93c5fd", "#86efac", "#fef08a", "#fbcfe8", "#cbd5e1"]
+                fig = px.treemap(
+                    location_data,
+                    path=["Nama Lokasi Kecelakaan Final"],
+                    values="Jumlah_Kasus",
+                    title="Distribusi Lokus Kecelakaan",
+                    color="Nama Lokasi Kecelakaan Final",
+                    color_discrete_sequence=soft_colors,
+                    template=chart_theme,
+                )
+                
+                fig.update_traces(
+                    customdata=location_data["Formatted_Cases"],
+                    texttemplate="<b>%{label}</b><br><span style='font-size:11px;'>%{customdata} kasus</span>",
+                    textfont=dict(size=13, color="#0f172a"),
+                )
+                fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+                st.plotly_chart(fig, use_container_width=True)
 
-            st.markdown(
-                """
-                <div style="display: flex; flex-wrap: wrap; gap: 12px; font-size: 12.5px; color: #334155; margin-top: -10px; margin-bottom: 20px; align-items: center;">
-                    <b></b>
-                    <span style="display:inline-flex; align-items:center; gap:5px;"><span style="width:14px; height:14px; background-color:#93c5fd; display:inline-block; border-radius:3px;"></span> Dalam lingkungan kerja</span>
-                    <span style="display:inline-flex; align-items:center; gap:5px;"><span style="width:14px; height:14px; background-color:#86efac; display:inline-block; border-radius:3px;"></span> Lalu lintas</span>
-                    <span style="display:inline-flex; align-items:center; gap:5px;"><span style="width:14px; height:14px; background-color:#fef08a; display:inline-block; border-radius:3px;"></span> Luar lingkungan kerja</span>
-                    <span style="display:inline-flex; align-items:center; gap:5px;"><span style="width:14px; height:14px; background-color:#fbcfe8; display:inline-block; border-radius:3px;"></span> Tidak diketahui</span>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+                st.markdown(
+                    """
+                    <div style="display: flex; flex-wrap: wrap; gap: 12px; font-size: 12.5px; color: #334155; margin-top: -10px; margin-bottom: 20px; align-items: center;">
+                        <b></b>
+                        <span style="display:inline-flex; align-items:center; gap:5px;"><span style="width:14px; height:14px; background-color:#93c5fd; display:inline-block; border-radius:3px;"></span> Dalam lingkungan kerja</span>
+                        <span style="display:inline-flex; align-items:center; gap:5px;"><span style="width:14px; height:14px; background-color:#86efac; display:inline-block; border-radius:3px;"></span> Lalu lintas</span>
+                        <span style="display:inline-flex; align-items:center; gap:5px;"><span style="width:14px; height:14px; background-color:#fef08a; display:inline-block; border-radius:3px;"></span> Luar lingkungan kerja</span>
+                        <span style="display:inline-flex; align-items:center; gap:5px;"><span style="width:14px; height:14px; background-color:#fbcfe8; display:inline-block; border-radius:3px;"></span> Tidak diketahui</span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
 
     st.markdown("<hr style='margin: 30px 0; border-color: #e2e8f0;'>", unsafe_allow_html=True)
     st.markdown("### Sumber Cedera, Bagian Sakit & Kondisi Akhir Pekerja")
@@ -1125,26 +1125,28 @@ with tab3:
                 values="ID Kasus Final",
                 aggfunc="nunique"
             ).reset_index()
-            source_data.columns = ["Nama Sumber Cedera Final", "Jumlah_Kasus"]
-            source_data = source_data.sort_values("Jumlah_Kasus", ascending=False).head(10)
-            source_data = source_data.sort_values("Jumlah_Kasus", ascending=True)
+            
+            if not source_data.empty:
+                source_data.columns = ["Nama Sumber Cedera Final", "Jumlah_Kasus"]
+                source_data = source_data.sort_values("Jumlah_Kasus", ascending=False).head(10)
+                source_data = source_data.sort_values("Jumlah_Kasus", ascending=True)
 
-            fig = px.bar(
-                source_data,
-                x="Jumlah_Kasus",
-                y="Nama Sumber Cedera Final",
-                orientation="h",
-                title="Top 10 Sumber Cedera",
-                color_discrete_sequence=["#7c3aed"],
-                template=chart_theme,
-            )
-            fig.update_layout(
-                xaxis_title="Jumlah Kasus",
-                yaxis_title="",
-                paper_bgcolor='rgba(0,0,0,0)',
-                plot_bgcolor='rgba(0,0,0,0)'
-            )
-            st.plotly_chart(fig, use_container_width=True)
+                fig = px.bar(
+                    source_data,
+                    x="Jumlah_Kasus",
+                    y="Nama Sumber Cedera Final",
+                    orientation="h",
+                    title="Top 10 Sumber Cedera",
+                    color_discrete_sequence=["#7c3aed"],
+                    template=chart_theme,
+                )
+                fig.update_layout(
+                    xaxis_title="Jumlah Kasus",
+                    yaxis_title="",
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)'
+                )
+                st.plotly_chart(fig, use_container_width=True)
 
     with col2:
         if "Nama Bagian Sakit Final" in filtered.columns:
@@ -1154,26 +1156,28 @@ with tab3:
                 values="ID Kasus Final",
                 aggfunc="nunique"
             ).reset_index()
-            body_data.columns = ["Nama Bagian Sakit Final", "Jumlah_Kasus"]
-            body_data = body_data.sort_values("Jumlah_Kasus", ascending=False).head(10)
-            body_data = body_data.sort_values("Jumlah_Kasus", ascending=True)
+            
+            if not body_data.empty:
+                body_data.columns = ["Nama Bagian Sakit Final", "Jumlah_Kasus"]
+                body_data = body_data.sort_values("Jumlah_Kasus", ascending=False).head(10)
+                body_data = body_data.sort_values("Jumlah_Kasus", ascending=True)
 
-            fig = px.bar(
-                body_data,
-                x="Jumlah_Kasus",
-                y="Nama Bagian Sakit Final",
-                orientation="h",
-                title="Top 10 Bagian Tubuh yang Sakit",
-                color_discrete_sequence=["#059669"],
-                template=chart_theme,
-            )
-            fig.update_layout(
-                xaxis_title="Jumlah Kasus",
-                yaxis_title="",
-                paper_bgcolor='rgba(0,0,0,0)',
-                plot_bgcolor='rgba(0,0,0,0)'
-            )
-            st.plotly_chart(fig, use_container_width=True)
+                fig = px.bar(
+                    body_data,
+                    x="Jumlah_Kasus",
+                    y="Nama Bagian Sakit Final",
+                    orientation="h",
+                    title="Top 10 Bagian Tubuh yang Sakit",
+                    color_discrete_sequence=["#059669"],
+                    template=chart_theme,
+                )
+                fig.update_layout(
+                    xaxis_title="Jumlah Kasus",
+                    yaxis_title="",
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)'
+                )
+                st.plotly_chart(fig, use_container_width=True)
 
     if "Kondisi Akhir" in filtered.columns:
         st.markdown("<br>", unsafe_allow_html=True)
@@ -1185,57 +1189,59 @@ with tab3:
             values="ID Kasus Final",
             aggfunc="nunique"
         ).reset_index()
-        cond_data.columns = ["Kondisi Akhir", "Jumlah_Kasus"]
-        cond_data = cond_data.sort_values("Jumlah_Kasus", ascending=False)
         
-        total_cond = cond_data["Jumlah_Kasus"].sum()
-        cond_data["Persen"] = (cond_data["Jumlah_Kasus"] / total_cond * 100).round(1) if total_cond > 0 else 0
-        cond_data["Formatted_Cases"] = cond_data["Jumlah_Kasus"].apply(format_number)
-        
-        step = (100 - 30) / max(1, len(cond_data) - 1)
-        cond_data["Esthetic_Val"] = [100 - i * step for i in range(len(cond_data))]
-        
-        fig_funnel = go.Figure(go.Funnel(
-            y=cond_data["Kondisi Akhir"],
-            x=cond_data["Esthetic_Val"],
-            textinfo="none",
-            marker=dict(
-                color=["#60a5fa", "#86efac", "#34d399", "#fbbf24", "#f87171", "#c084fc"][:len(cond_data)],
-                line=dict(color="#ffffff", width=2)
-            ),
-            customdata=np.stack([
-                cond_data["Kondisi Akhir"],
-                cond_data["Formatted_Cases"],
-                cond_data["Persen"]
-            ], axis=-1),
-            hovertemplate="<b>%{customdata[0]}</b><br>Jumlah Kasus: <b>%{customdata[1]} kasus</b><br>Persentase: <b>%{customdata[2]}%</b><extra></extra>"
-        ))
-        
-        annotations = []
-        for i, row in cond_data.reset_index(drop=True).iterrows():
-            annotations.append(
-                dict(
-                    x=0.5,
-                    y=row["Kondisi Akhir"],
-                    xref="paper",
-                    yref="y",
-                    text=f"<b>{row['Kondisi Akhir']}</b>: {row['Formatted_Cases']} kasus ({row['Persen']}%)",
-                    showarrow=False,
-                    font=dict(size=9.5, color="#0f172a", family="Inter, sans-serif")
+        if not cond_data.empty:
+            cond_data.columns = ["Kondisi Akhir", "Jumlah_Kasus"]
+            cond_data = cond_data.sort_values("Jumlah_Kasus", ascending=False)
+            
+            total_cond = cond_data["Jumlah_Kasus"].sum()
+            cond_data["Persen"] = (cond_data["Jumlah_Kasus"] / total_cond * 100).round(1) if total_cond > 0 else 0
+            cond_data["Formatted_Cases"] = cond_data["Jumlah_Kasus"].apply(format_number)
+            
+            step = (100 - 30) / max(1, len(cond_data) - 1)
+            cond_data["Esthetic_Val"] = [100 - i * step for i in range(len(cond_data))]
+            
+            fig_funnel = go.Figure(go.Funnel(
+                y=cond_data["Kondisi Akhir"],
+                x=cond_data["Esthetic_Val"],
+                textinfo="none",
+                marker=dict(
+                    color=["#60a5fa", "#86efac", "#34d399", "#fbbf24", "#f87171", "#c084fc"][:len(cond_data)],
+                    line=dict(color="#ffffff", width=2)
+                ),
+                customdata=np.stack([
+                    cond_data["Kondisi Akhir"],
+                    cond_data["Formatted_Cases"],
+                    cond_data["Persen"]
+                ], axis=-1),
+                hovertemplate="<b>%{customdata[0]}</b><br>Jumlah Kasus: <b>%{customdata[1]} kasus</b><br>Persentase: <b>%{customdata[2]}%</b><extra></extra>"
+            ))
+            
+            annotations = []
+            for i, row in cond_data.reset_index(drop=True).iterrows():
+                annotations.append(
+                    dict(
+                        x=0.5,
+                        y=row["Kondisi Akhir"],
+                        xref="paper",
+                        yref="y",
+                        text=f"<b>{row['Kondisi Akhir']}</b>: {row['Formatted_Cases']} kasus ({row['Persen']}%)",
+                        showarrow=False,
+                        font=dict(size=9.5, color="#0f172a", family="Inter, sans-serif")
+                    )
                 )
-            )
 
-        fig_funnel.update_layout(
-            template=chart_theme,
-            height=500,
-            margin=dict(l=40, r=40, t=20, b=40),
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            xaxis=dict(visible=False, showgrid=False),
-            yaxis=dict(title="", tickfont=dict(size=11, color="#0f172a")),
-            annotations=annotations
-        )
-        st.plotly_chart(fig_funnel, use_container_width=True)
+            fig_funnel.update_layout(
+                template=chart_theme,
+                height=500,
+                margin=dict(l=40, r=40, t=20, b=40),
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                xaxis=dict(visible=False, showgrid=False),
+                yaxis=dict(title="", tickfont=dict(size=11, color="#0f172a")),
+                annotations=annotations
+            )
+            st.plotly_chart(fig_funnel, use_container_width=True)
 
 # ============================================================
 # TAB 4: CASE EXPLORER
