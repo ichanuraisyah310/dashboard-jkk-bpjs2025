@@ -263,8 +263,10 @@ def find_excel_file():
 
 @st.cache_data(show_spinner=False)
 def load_and_process_data(file_path):
+    # Memuat sheet JKK_CLEANING
     df = pd.read_excel(file_path, sheet_name="JKK_CLEANING")
     
+    # Memuat sheet GROUPING untuk tab Kanwil & Cabang
     try:
         df_grouping = pd.read_excel(file_path, sheet_name="GROUPING")
     except Exception:
@@ -294,6 +296,7 @@ def load_and_process_data(file_path):
     if "ID Kasus Final" in df.columns:
         df = df[df["ID Kasus Final"].notna()].copy()
 
+    # Normalisasi Jenis Kelamin
     if "Jenis Kelamin" in df.columns:
         df["Jenis Kelamin"] = df["Jenis Kelamin"].astype(str).str.strip().replace({
             "L": "Laki-laki",
@@ -325,6 +328,7 @@ def load_and_process_data(file_path):
 
     available_case_cols = [col for col in case_cols if col in df.columns]
     
+    # Cleansing & Agregasi Murni Berdasarkan ID Kasus Final
     groupby_keys = ["ID Kasus Final"]
 
     agg_dict = {col: "first" for col in available_case_cols if col not in groupby_keys}
@@ -338,6 +342,7 @@ def load_and_process_data(file_path):
         cases_df["Bulan"] = cases_df["tgl_kejadian"].dt.month
         cases_df["Nama Bulan"] = cases_df["tgl_kejadian"].dt.strftime("%b")
 
+    # Pembersihan Data Usia
     if range_usia_col_name and range_usia_col_name in cases_df.columns:
         numeric_age = pd.to_numeric(cases_df[range_usia_col_name], errors="coerce")
         
@@ -370,9 +375,12 @@ def load_and_process_data(file_path):
     else:
         cases_df["Range Usia"] = "Tidak Diketahui"
 
+    # Proses Standarisasi Kolom pada Sheet GROUPING jika tersedia
     if not df_grouping.empty:
+        # Menyesuaikan nama kolom agar seragam (case-insensitive & strip)
         df_grouping.columns = [str(c).strip() for c in df_grouping.columns]
         
+        # Mapping nama kolom jika ada variasi penamaan di excel
         col_map_group = {}
         for c in df_grouping.columns:
             c_low = c.lower()
@@ -417,6 +425,7 @@ st.sidebar.markdown("---")
 years = sorted(cases["Tahun"].dropna().unique().tolist()) if "Tahun" in cases.columns else []
 selected_year = st.sidebar.multiselect("Tahun", options=years, default=years)
 
+# Mengambil opsi filter Kanwil dari sheet GROUPING jika ada, jika tidak fallback ke cases
 if not df_grouping.empty and "Nama Kanwil Pelayanan" in df_grouping.columns:
     kanwil_options = sorted(df_grouping["Nama Kanwil Pelayanan"].dropna().astype(str).unique())
 else:
@@ -426,6 +435,7 @@ selected_kanwil = st.sidebar.multiselect(
     "Kanwil Pelayanan", options=kanwil_options, default=[]
 )
 
+# Filter untuk branch options berdasarkan GROUPING atau cases
 if not df_grouping.empty and "Nama Kantor Pelayanan (Cabang)" in df_grouping.columns:
     filtered_for_branch_group = df_grouping.copy()
     if selected_kanwil and "Nama Kanwil Pelayanan" in filtered_for_branch_group.columns:
@@ -540,28 +550,13 @@ chart_theme = "plotly_white"
 
 
 # ============================================================
-# TAB 1: KANWIL & CABANG (SUMBER DATA GROUPING + FILTER JKK CLEANING)
+# TAB 1: KANWIL & CABANG (SUMBER DATA GROUPING)
 # ============================================================
 
 with tab1:
-    # Mengambil base dari GROUPING untuk jumlah kasus & nominal, lalu digabungkan/difilter berdasarkan `filtered` (JKK Cleaning)
+    # Menyiapkan data grouping yang difilter sesuai pilihan sidebar
     if not df_grouping.empty:
-        # Filter JKK cleaning hanya mengambil ID Kasus yang lolos filter sidebar lainnya (tahun, jenis kelamin, sektor, usia, lokus)
-        filtered_ids = filtered["ID Kasus Final"].unique() if "ID Kasus Final" in filtered.columns else []
-        
-        # Agregasi ulang dari sheet GROUPING yang di-filter berdasarkan ID yang ada di `filtered` (JKK cleaning)
-        # Untuk memastikan baris tetap terfilter dinamis saat filter lain (seperti jenis kelamin, sektor, usia, lokus) dipilih.
-        tab1_base = df_grouping.copy()
-        
-        # Jika ada filter selain kanwil/cabang yang aktif, kita batasi berdasarkan ID Kasus dari `filtered`
-        if len(selected_gender) > 0 or len(selected_sector) > 0 or len(selected_age_groups) > 0 or len(selected_location) > 0 or len(selected_year) > 0:
-            # Join dengan cases untuk mencocokkan ID Kasus Grouping dengan JKK Cleaning
-            # Karena GROUPING umumnya berisi agregat per Kanwil/Cabang, kita filter baris GROUPING yang Kanwil/Cabangnya sesuai dengan data `filtered`
-            valid_kanwil_cabang = filtered[["Nama Kanwil Pelayanan", "Nama Kantor Pelayanan (Cabang)"]].drop_duplicates()
-            tab1_source = pd.merge(tab1_base, valid_kanwil_cabang, on=["Nama Kanwil Pelayanan", "Nama Kantor Pelayanan (Cabang)"], how="inner")
-        else:
-            tab1_source = tab1_base.copy()
-
+        tab1_source = df_grouping.copy()
         if selected_kanwil and "Nama Kanwil Pelayanan" in tab1_source.columns:
             tab1_source = tab1_source[tab1_source["Nama Kanwil Pelayanan"].isin(selected_kanwil)]
         if selected_branch and "Nama Kantor Pelayanan (Cabang)" in tab1_source.columns:
@@ -775,6 +770,7 @@ with tab1:
             })
             summary_table.columns = ["Nama Kanwil Pelayanan", "Nama Kantor Pelayanan (Cabang)", "Jumlah_Kasus", "Nominal_Manfaat"]
             
+        # Perhitungan rata-rata dari data grouping
         summary_table["Rata-rata Manfaat/Kasus"] = summary_table.apply(
             lambda row: (row["Nominal_Manfaat"] / row["Jumlah_Kasus"]) if row["Jumlah_Kasus"] > 0 else 0, axis=1
         )
