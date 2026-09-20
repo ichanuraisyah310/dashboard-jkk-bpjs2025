@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import streamlit as st
 
 # ============================================================
@@ -64,7 +65,7 @@ def wrap_labels(labels, width=14):
 
 
 # ============================================================
-# CUSTOM CSS (TEXT SELECTION ENABLED & STYLING)
+# CUSTOM CSS (TEXT SELECTION, STYLING & PRINT-TO-PDF FIX)
 # ============================================================
 
 st.markdown(
@@ -211,6 +212,32 @@ st.markdown(
         font-size: 13px;
         box-shadow: 0 2px 4px 0 rgba(30, 58, 138, 0.2);
     }
+
+    /* ======================================================== */
+    /* PENGATURAN CETAK / PDF AGAR RAPI DAN TIDAK BERANTAKAN      */
+    /* ======================================================== */
+    @media print {
+        section[data-testid="stSidebar"] {
+            display: none !important;
+        }
+        header {
+            display: none !important;
+        }
+        .stButton, .stDownloadButton {
+            display: none !important;
+        }
+        .stTabs [data-baseweb="tab-list"] {
+            display: none !important;
+        }
+        body {
+            background: white !important;
+            color: black !important;
+        }
+        .block-container {
+            padding: 0 !important;
+            max-width: 100% !important;
+        }
+    }
 </style>
 """,
     unsafe_allow_html=True,
@@ -252,7 +279,7 @@ def load_and_process_data(file_path):
     jam_col_name = get_col(
         df, ["Ket Jam Final", "ket_jam_final", "Ket_Jam_Final", "jam_kecelakaan"]
     )
-    range_usia_col_name = get_col(df, ["Range Usia", "range usia", "range_usia"])
+    range_usia_col_name = get_col(df, ["Range Usia", "range usia", "range_usia", "usia"])
 
     if "tgl_kejadian" in df.columns:
         df["tgl_kejadian"] = pd.to_datetime(df["tgl_kejadian"], errors="coerce")
@@ -264,6 +291,15 @@ def load_and_process_data(file_path):
 
     if "ID Kasus Final" in df.columns:
         df = df[df["ID Kasus Final"].notna()].copy()
+
+    # Normalisasi Jenis Kelamin agar L dan P terbaca utuh Laki-laki / Perempuan
+    if "Jenis Kelamin" in df.columns:
+        df["Jenis Kelamin"] = df["Jenis Kelamin"].astype(str).str.strip().replace({
+            "L": "Laki-laki",
+            "P": "Perempuan",
+            "l": "Laki-laki",
+            "p": "Perempuan"
+        })
 
     case_cols = [
         "ID Kasus Final",
@@ -298,25 +334,41 @@ def load_and_process_data(file_path):
         cases_df["Bulan"] = cases_df["tgl_kejadian"].dt.month
         cases_df["Nama Bulan"] = cases_df["tgl_kejadian"].dt.strftime("%b")
 
+    # =========================================================================
+    # LOGIKA PEMBERSIHAN DATA USIA:
+    # Hanya nilai usia yang berada di dalam rentang valid 18 - 100 tahun yang akan 
+    # dikelompokkan ke kategori usia. Di luar rentang 18 - 100 tahun, atau jika 
+    # data tidak valid/kosong, akan otomatis dikategorikan sebagai "Tidak Diketahui".
+    # =========================================================================
     if range_usia_col_name and range_usia_col_name in cases_df.columns:
-        cases_df["Range Usia Clean"] = cases_df[range_usia_col_name].astype(str).str.strip()
+        numeric_age = pd.to_numeric(cases_df[range_usia_col_name], errors="coerce")
         
-        mapping_usia = {
-            "<= 30 Tahun": "≤ 30 Tahun",
-            "<=30": "≤ 30 Tahun",
-            "31 - 50 Tahun": "31 - 50 Tahun",
-            "31-50": "31 - 50 Tahun",
-            ">= 51 Tahun": "≥ 51 Tahun",
-            ">=51": "≥ 51 Tahun",
-        }
-        cases_df["Range Usia"] = cases_df["Range Usia Clean"].replace(mapping_usia)
-        
-        valid_age_labels = [
-            "≤ 30 Tahun",
-            "31 - 50 Tahun",
-            "≥ 51 Tahun"
-        ]
-        cases_df.loc[~cases_df["Range Usia"].isin(valid_age_labels), "Range Usia"] = "Tidak Diketahui"
+        if numeric_age.notna().sum() > 0:
+            cases_df["Range Usia"] = "Tidak Diketahui"
+            valid_mask = (numeric_age >= 18) & (numeric_age <= 100)
+            
+            cases_df.loc[valid_mask & (numeric_age <= 30), "Range Usia"] = "≤ 30 Tahun"
+            cases_df.loc[valid_mask & (numeric_age >= 31) & (numeric_age <= 50), "Range Usia"] = "31 - 50 Tahun"
+            cases_df.loc[valid_mask & (numeric_age >= 51), "Range Usia"] = "≥ 51 Tahun"
+        else:
+            cases_df["Range Usia Clean"] = cases_df[range_usia_col_name].astype(str).str.strip()
+            
+            mapping_usia = {
+                "<= 30 Tahun": "≤ 30 Tahun",
+                "<=30": "≤ 30 Tahun",
+                "31 - 50 Tahun": "31 - 50 Tahun",
+                "31-50": "31 - 50 Tahun",
+                ">= 51 Tahun": "≥ 51 Tahun",
+                ">=51": "≥ 51 Tahun",
+            }
+            cases_df["Range Usia"] = cases_df["Range Usia Clean"].replace(mapping_usia)
+            
+            valid_age_labels = [
+                "≤ 30 Tahun",
+                "31 - 50 Tahun",
+                "≥ 51 Tahun"
+            ]
+            cases_df.loc[~cases_df["Range Usia"].isin(valid_age_labels), "Range Usia"] = "Tidak Diketahui"
     else:
         cases_df["Range Usia"] = "Tidak Diketahui"
 
@@ -384,7 +436,8 @@ selected_sector = st.sidebar.multiselect(
 age_group_options = [
     "≤ 30 Tahun",
     "31 - 50 Tahun",
-    "≥ 51 Tahun"
+    "≥ 51 Tahun",
+    "Tidak Diketahui"
 ]
 selected_age_groups = st.sidebar.multiselect(
     "Range Usia", options=age_group_options, default=[]
@@ -397,7 +450,6 @@ selected_location = st.sidebar.multiselect(
     "Lokus Kecelakaan", options=location_options, default=[]
 )
 
-# Optimized filtering using boolean mask indexing for high performance
 filtered = cases
 if selected_year and "Tahun" in filtered.columns:
     filtered = filtered[filtered["Tahun"].isin(selected_year)]
@@ -463,96 +515,205 @@ chart_theme = "plotly_white"
 # ============================================================
 
 with tab1:
-    st.markdown("### Analisis Kasus & Nominal Manfaat per Kanwil Pelayanan")
+    if selected_kanwil:
+        st.markdown(f"### Analisis Kasus & Nominal Manfaat per Cabang di Kanwil: {', '.join(selected_kanwil)}")
+    else:
+        st.markdown("### Analisis Kasus & Nominal Manfaat per Kanwil Pelayanan")
 
-    if "Nama Kanwil Pelayanan" in filtered.columns:
-        kanwil_summary = (
-            filtered.groupby("Nama Kanwil Pelayanan", observed=False)
-            .agg(
-                Jumlah_Kasus=("ID Kasus Final", "nunique"),
-                Nominal=("nom_manfaat_netto", "sum"),
+    if not selected_kanwil:
+        group_col = "Nama Kanwil Pelayanan"
+        if group_col in filtered.columns:
+            kanwil_summary = (
+                filtered.groupby(group_col, observed=False)
+                .agg(
+                    Jumlah_Kasus=("ID Kasus Final", "nunique"),
+                    Total_Nominal=("nom_manfaat_netto", "sum"),
+                )
+                .reset_index()
+                .sort_values("Jumlah_Kasus", ascending=False)
             )
-            .reset_index()
-            .sort_values("Jumlah_Kasus", ascending=False)
-        )
 
-        kanwils = kanwil_summary["Nama Kanwil Pelayanan"].tolist()
-        cases_list = kanwil_summary["Jumlah_Kasus"].tolist()
-        nominal_list = kanwil_summary["Nominal"].tolist()
+            wrapped_names = wrap_labels(kanwil_summary[group_col], width=14)
+            compact_labels = [format_currency_compact_intl(n) for n in kanwil_summary["Total_Nominal"]]
+            formatted_hover_nominal = [format_currency(val) for val in kanwil_summary["Total_Nominal"]]
 
-        max_c = max(cases_list) if cases_list and max(cases_list) > 0 else 1
-        max_n = max(nominal_list) if nominal_list and max(nominal_list) > 0 else 1
+            bar_fonts = [
+                10.5 if count < 5000 else 9.5 for count in kanwil_summary["Jumlah_Kasus"]
+            ]
 
-        cases_scaled = [- (c / max_c) * 100 for c in cases_list]
-        nominal_scaled = [(n / max_n) * 100 for n in nominal_list]
+            max_case_kanwil = kanwil_summary["Jumlah_Kasus"].max() if not kanwil_summary["Jumlah_Kasus"].empty else 10
+            
+            if max_case_kanwil <= 50:
+                suggested_max_y_kanwil = 100
+                dynamic_dtick_kanwil = 20
+            else:
+                suggested_max_y_kanwil = max_case_kanwil * 1.1
+                if max_case_kanwil > 20000:
+                    dynamic_dtick_kanwil = 5000
+                elif max_case_kanwil > 5000:
+                    dynamic_dtick_kanwil = 2000
+                elif max_case_kanwil > 1000:
+                    dynamic_dtick_kanwil = 500
+                elif max_case_kanwil > 200:
+                    dynamic_dtick_kanwil = 100
+                else:
+                    dynamic_dtick_kanwil = 20
 
-        color_left = '#0284c7'
-        color_right = '#059669'
+            max_nominal_kanwil = kanwil_summary["Total_Nominal"].max() if not kanwil_summary["Total_Nominal"].empty else 100
+            suggested_max_y2_kanwil = max_nominal_kanwil * 1.1 if max_nominal_kanwil > 0 else 100
 
-        fig_bi = go.Figure()
+            fig_dual_kanwil = go.Figure()
 
-        fig_bi.add_trace(go.Bar(
-            y=kanwils,
-            x=cases_scaled,
-            orientation='h',
-            name='Jumlah Kasus JKK',
-            marker=dict(color=color_left),
-            text=[f"{format_number(c)} kasus" for c in cases_list],
-            textposition='outside',
-            textfont=dict(size=11, color='#0f172a', family='Inter, sans-serif'),
-            customdata=cases_list,
-            hovertemplate="<b>%{y}</b><br>Jumlah Kasus: <b>%{customdata:,} kasus</b><extra></extra>"
-        ))
+            fig_dual_kanwil.add_trace(go.Bar(
+                x=wrapped_names,
+                y=kanwil_summary["Jumlah_Kasus"],
+                name="Jumlah Kasus",
+                marker=dict(color="#fb923c", opacity=0.9),
+                text=[f"{format_number(c)} kasus" for c in kanwil_summary["Jumlah_Kasus"]],
+                textposition="inside",
+                insidetextanchor="start",
+                textfont=dict(size=bar_fonts, color="#7c2d12", family="Inter, sans-serif"),
+                customdata=kanwil_summary[group_col],
+                hovertemplate="<b>%{customdata}</b><br>Jumlah Kasus: <b>%{y:,} kasus</b><extra></extra>",
+                yaxis="y"
+            ))
 
-        fig_bi.add_trace(go.Bar(
-            y=kanwils,
-            x=nominal_scaled,
-            orientation='h',
-            name='Nominal Manfaat JKK',
-            marker=dict(color=color_right),
-            text=[format_currency_compact_intl(n) for n in nominal_list],
-            textposition='outside',
-            textfont=dict(size=11, color='#0f172a', family='Inter, sans-serif'),
-            customdata=[format_currency(n) for n in nominal_list],
-            hovertemplate="<b>%{y}</b><br>Nominal Manfaat: <b>%{customdata}</b><extra></extra>"
-        ))
+            fig_dual_kanwil.add_trace(go.Scatter(
+                x=wrapped_names,
+                y=kanwil_summary["Total_Nominal"],
+                name="Total Nominal Manfaat",
+                mode="lines+markers+text",
+                line=dict(color="#059669", width=3.5),
+                marker=dict(size=10, color="#059669", line=dict(color="#ffffff", width=2)),
+                text=compact_labels,
+                textposition="top center",
+                textfont=dict(size=10, color="#065f46", family="Inter, sans-serif"),
+                customdata=np.stack([kanwil_summary[group_col], formatted_hover_nominal], axis=-1),
+                hovertemplate="<b>%{customdata[0]}</b><br>Total Nominal Manfaat: <b>%{customdata[1]}</b><extra></extra>",
+                yaxis="y2"
+            ))
 
-        fig_bi.update_layout(
-            barmode='relative',
-            template='plotly_white',
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            height=max(550, len(kanwils) * 45),
-            margin=dict(l=160, r=40, t=50, b=90),
-            xaxis=dict(
-                tickvals=[-100, -75, -50, -25, 0, 25, 50, 75, 100],
-                ticktext=['100%', '75%', '50%', '25%', '0', '25%', '50%', '75%', '100%'],
-                title=dict(
-                    text='<b>◄ Jumlah Kasus</b> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <b>Nominal Manfaat ►</b>',
-                    font=dict(size=13, color='#0f172a')
+            fig_dual_kanwil.update_layout(
+                template=chart_theme,
+                height=880,
+                margin=dict(l=50, r=50, t=20, b=90),
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                xaxis=dict(
+                    title="",
+                    tickangle=0,
+                    tickfont=dict(size=8.5, color="#0f172a", family="Inter, sans-serif")
                 ),
-                gridcolor='#e2e8f0',
-                zerolinecolor='#334155',
-                zerolinewidth=1.5,
-                range=[-140, 140]
-            ),
-            yaxis=dict(
-                title='',
-                autorange='reversed' if len(kanwils) > 0 else True,
-                tickfont=dict(size=11, color='#0f172a', family='Inter, sans-serif'),
-                zerolinecolor='#334155',
-                zerolinewidth=1.5
-            ),
-            legend=dict(orientation='h', yanchor='bottom', y=-0.3, xanchor='center', x=0.5)
-        )
+                yaxis=dict(
+                    title=dict(text="Jumlah Kasus", font=dict(color="#334155")),
+                    gridcolor="#cbd5e1",
+                    zeroline=True,
+                    side="left",
+                    rangemode="tozero",
+                    range=[0, suggested_max_y_kanwil],
+                    dtick=dynamic_dtick_kanwil
+                ),
+                yaxis2=dict(
+                    title=dict(text="Total Nominal Manfaat (Rp)", font=dict(color="#059669")),
+                    overlaying="y",
+                    side="right",
+                    showgrid=False,
+                    zeroline=False,
+                    rangemode="tozero",
+                    range=[0, suggested_max_y2_kanwil]
+                ),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            )
 
-        st.plotly_chart(fig_bi, use_container_width=True)
+            st.plotly_chart(fig_dual_kanwil, use_container_width=True)
 
-    st.markdown("<hr style='margin: 30px 0; border-color: #e2e8f0;'>", unsafe_allow_html=True)
+    else:
+        group_col = "Nama Kantor Pelayanan (Cabang)"
+        if group_col in filtered.columns:
+            branch_summary = (
+                filtered.groupby(group_col, observed=False)
+                .agg(
+                    Jumlah_Kasus=("ID Kasus Final", "nunique"),
+                    Total_Nominal=("nom_manfaat_netto", "sum"),
+                )
+                .reset_index()
+                .sort_values("Jumlah_Kasus", ascending=True)
+            )
+
+            branch_names = branch_summary[group_col].tolist()
+            kasus_vals = branch_summary["Jumlah_Kasus"].tolist()
+            nominal_vals = branch_summary["Total_Nominal"].tolist()
+
+            kasus_text = [f"{format_number(c)} kasus" for c in kasus_vals]
+            nominal_text = [format_currency_compact_intl(n) for n in nominal_vals]
+            formatted_hover_nominal = [format_currency(n) for n in nominal_vals]
+
+            fig_pyramid = make_subplots(
+                rows=1, cols=2,
+                shared_yaxes=True,
+                horizontal_spacing=0.08
+            )
+
+            fig_pyramid.add_trace(go.Bar(
+                y=branch_names,
+                x=kasus_vals,
+                name="Jumlah Kasus",
+                orientation="h",
+                marker=dict(color="#0284c7"),
+                text=kasus_text,
+                textposition="inside",
+                insidetextanchor="middle",
+                textfont=dict(size=11, color="white", family="Inter, sans-serif"),
+                customdata=np.stack([branch_names, kasus_vals], axis=-1),
+                hovertemplate="Cabang: <b>%{customdata[0]}</b><br>Jumlah Kasus: <b>%{customdata[1]:,} kasus</b><extra></extra>"
+            ), row=1, col=1)
+
+            fig_pyramid.add_trace(go.Bar(
+                y=branch_names,
+                x=nominal_vals,
+                name="Total Nominal Manfaat",
+                orientation="h",
+                marker=dict(color="#059669"),
+                text=nominal_text,
+                textposition="inside",
+                insidetextanchor="middle",
+                textfont=dict(size=11, color="white", family="Inter, sans-serif"),
+                customdata=np.stack([branch_names, formatted_hover_nominal], axis=-1),
+                hovertemplate="Cabang: <b>%{customdata[0]}</b><br>Total Nominal Manfaat: <b>%{customdata[1]}</b><extra></extra>"
+            ), row=1, col=2)
+
+            fig_pyramid.update_layout(
+                template=chart_theme,
+                height=max(650, len(branch_summary) * 40),
+                margin=dict(l=180, r=50, t=60, b=40),
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                showlegend=True,
+                legend=dict(orientation="h", yanchor="bottom", y=1.08, xanchor="center", x=0.5)
+            )
+
+            fig_pyramid.update_xaxes(
+                title_text="<b>◄ Jumlah Kasus (Log Scale)</b>",
+                type="log",
+                autorange="reversed",
+                row=1, col=1,
+                showgrid=True
+            )
+            fig_pyramid.update_xaxes(
+                title_text="<b>Total Nominal Manfaat (Rp, Log Scale) ►</b>",
+                type="log",
+                row=1, col=2,
+                showgrid=True
+            )
+            fig_pyramid.update_yaxes(tickfont=dict(size=11, color="#0f172a", family="Inter, sans-serif"))
+
+            st.plotly_chart(fig_pyramid, use_container_width=True)
+
+    st.markdown("<hr style='margin: 15px 0 30px 0; border-color: #e2e8f0;'>", unsafe_allow_html=True)
     st.markdown("### Detail Jumlah Kasus & Nominal di Masing-masing Cabang")
 
     if "Nama Kanwil Pelayanan" in filtered.columns and "Nama Kantor Pelayanan (Cabang)" in filtered.columns:
-        branch_summary = (
+        branch_summary_table = (
             filtered.groupby(["Nama Kanwil Pelayanan", "Nama Kantor Pelayanan (Cabang)"], observed=False)
             .agg(
                 Jumlah_Kasus=("ID Kasus Final", "nunique"),
@@ -560,12 +721,12 @@ with tab1:
             )
             .reset_index()
         )
-        branch_summary["Rata-rata Manfaat/Kasus"] = (
-            branch_summary["Nominal_Manfaat"] / branch_summary["Jumlah_Kasus"]
+        branch_summary_table["Rata-rata Manfaat/Kasus"] = (
+            branch_summary_table["Nominal_Manfaat"] / branch_summary_table["Jumlah_Kasus"]
         )
-        branch_summary = branch_summary.sort_values("Jumlah_Kasus", ascending=False)
+        branch_summary_table = branch_summary_table.sort_values("Jumlah_Kasus", ascending=False)
 
-        branch_display = branch_summary.copy()
+        branch_display = branch_summary_table.copy()
         branch_display["Jumlah_Kasus"] = branch_display["Jumlah_Kasus"].apply(format_number)
         branch_display["Nominal_Manfaat"] = branch_display["Nominal_Manfaat"].apply(format_currency)
         branch_display["Rata-rata Manfaat/Kasus"] = branch_display["Rata-rata Manfaat/Kasus"].apply(format_currency)
@@ -574,7 +735,7 @@ with tab1:
 
 
 # ============================================================
-# TAB 2: SEKTOR BPS
+# TAB 2: SEKTOR BPS (DINAMIS MENYESUAIKAN FILTER DATA)
 # ============================================================
 
 with tab2:
@@ -595,9 +756,28 @@ with tab2:
         compact_labels = [format_currency_compact_intl(n) for n in bps_data["Total_Nominal"]]
         formatted_hover_nominal = [format_currency(val) for val in bps_data["Total_Nominal"]]
 
-        bar_fonts = [
-            10.5 if count < 5000 else 9.5 for count in bps_data["Jumlah_Kasus"]
-        ]
+        bar_fonts = [9.5 for _ in range(len(bps_data))]
+
+        max_case_bps = bps_data["Jumlah_Kasus"].max() if not bps_data["Jumlah_Kasus"].empty else 10
+        
+        if max_case_bps <= 50:
+            suggested_max_y_bps = 100
+            dynamic_dtick_bps = 20
+        else:
+            suggested_max_y_bps = max_case_bps * 1.1
+            if max_case_bps > 20000:
+                dynamic_dtick_bps = 5000
+            elif max_case_bps > 5000:
+                dynamic_dtick_bps = 2000
+            elif max_case_bps > 1000:
+                dynamic_dtick_bps = 500
+            elif max_case_bps > 200:
+                dynamic_dtick_bps = 100
+            else:
+                dynamic_dtick_bps = 20
+
+        max_nominal_val = bps_data["Total_Nominal"].max() if not bps_data["Total_Nominal"].empty else 100
+        suggested_max_y2 = max_nominal_val * 1.1
 
         fig_dual = go.Figure()
 
@@ -632,8 +812,8 @@ with tab2:
 
         fig_dual.update_layout(
             template=chart_theme,
-            height=750,
-            margin=dict(l=50, r=50, t=20, b=280),
+            height=880,
+            margin=dict(l=50, r=50, t=20, b=90),
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
             xaxis=dict(
@@ -646,7 +826,9 @@ with tab2:
                 gridcolor="#cbd5e1",
                 zeroline=True,
                 side="left",
-                rangemode="tozero"
+                rangemode="tozero",
+                range=[0, suggested_max_y_bps],
+                dtick=dynamic_dtick_bps
             ),
             yaxis2=dict(
                 title=dict(text="Total Nominal Manfaat (Rp)", font=dict(color="#1d4ed8")),
@@ -654,14 +836,15 @@ with tab2:
                 side="right",
                 showgrid=False,
                 zeroline=False,
-                rangemode="tozero"
+                rangemode="tozero",
+                range=[0, suggested_max_y2]
             ),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
         )
 
         st.plotly_chart(fig_dual, use_container_width=True)
 
-        st.markdown("<hr style='margin: 30px 0; border-color: #e2e8f0;'>", unsafe_allow_html=True)
+        st.markdown("<hr style='margin: 15px 0 30px 0; border-color: #e2e8f0;'>", unsafe_allow_html=True)
         st.markdown("### Tabel Rincian Seluruh Sektor BPS")
 
         bps_full = (
@@ -724,11 +907,10 @@ with tab3:
                 textfont=dict(size=12, family="Inter, sans-serif"),
                 marker=dict(line=dict(color="#ffffff", width=2)),
                 customdata=np.stack([
-                    age_agg["Range Usia"].astype(str),
                     age_agg["Jumlah_Kasus"].apply(format_number),
                     age_agg["Persentase"].astype(str)
                 ], axis=-1),
-                hovertemplate="<b>Range Usia:</b> %{customdata[0]}<br><b>Jumlah Kasus:</b> %{customdata[1]} kasus<br><b>Persentase:</b> %{customdata[2]}%<extra></extra>"
+                hovertemplate="<b>Range Usia:</b> %{label}<br><b>Jumlah Kasus:</b> %{customdata[0]} kasus<br><b>Persentase:</b> %{customdata[1]}%<extra></extra>"
             )
             fig_pie.update_layout(
                 paper_bgcolor='rgba(0,0,0,0)',
@@ -746,6 +928,16 @@ with tab3:
             age_display = age_display[["Range Usia", "Jumlah_Kasus", "Persentase (%)"]]
             
             st.dataframe(age_display, use_container_width=True, hide_index=True)
+
+        # KETENTUAN 1: CATATAN RANGE USIA
+        st.markdown(
+            """
+            <div style="background-color: #f8fafc; border-left: 4px solid #3b82f6; padding: 10px 15px; border-radius: 4px; font-size: 13.5px; color: #334155; margin-top: 10px; margin-bottom: 25px;">
+                <b>Catatan:</b> Data dengan rentang usia di luar 18–100 tahun telah disaring melalui proses data cleansing dan dikategorikan sebagai "Tidak Diketahui".
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
         st.markdown("<hr style='margin: 30px 0; border-color: #e2e8f0;'>", unsafe_allow_html=True)
 
@@ -855,6 +1047,19 @@ with tab3:
             fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
             st.plotly_chart(fig, use_container_width=True)
 
+            # KETENTUAN 3: KOTAK WARNA PENANDA LOKUS KECELAKAAN
+            st.markdown(
+                """
+                <div style="display: flex; flex-wrap: wrap; gap: 12px; font-size: 12.5px; color: #334155; margin-top: -10px; margin-bottom: 20px; align-items: center;">
+                    <span style="display:inline-flex; align-items:center; gap:5px;"><span style="width:14px; height:14px; background-color:#93c5fd; display:inline-block; border-radius:3px;"></span> Dalam lingkungan kerja</span>
+                    <span style="display:inline-flex; align-items:center; gap:5px;"><span style="width:14px; height:14px; background-color:#86efac; display:inline-block; border-radius:3px;"></span> Lalu lintas</span>
+                    <span style="display:inline-flex; align-items:center; gap:5px;"><span style="width:14px; height:14px; background-color:#fef08a; display:inline-block; border-radius:3px;"></span> Luar lingkungan kerja</span>
+                    <span style="display:inline-flex; align-items:center; gap:5px;"><span style="width:14px; height:14px; background-color:#fbcfe8; display:inline-block; border-radius:3px;"></span> Tidak diketahui</span>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
     st.markdown("<hr style='margin: 30px 0; border-color: #e2e8f0;'>", unsafe_allow_html=True)
     st.markdown("### Sumber Cedera, Bagian Sakit & Kondisi Akhir Pekerja")
 
@@ -959,7 +1164,7 @@ with tab3:
                     yref="y",
                     text=f"<b>{row['Kondisi Akhir']}</b>: {row['Formatted_Cases']} kasus ({row['Persen']}%)",
                     showarrow=False,
-                    font=dict(size=10.5, color="#0f172a", family="Inter, sans-serif")
+                    font=dict(size=9.5, color="#0f172a", family="Inter, sans-serif")
                 )
             )
 
