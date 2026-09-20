@@ -670,7 +670,7 @@ with tab1:
             st.plotly_chart(fig_dual_kanwil, use_container_width=True)
 
     else:
-        st.markdown(f"### Analisis Kasus & Nominal Manfaat per Cabang di Kanwil: {', '.join(selected_kanwil)} (Data Grouping)")
+        st.markdown(f"### Analisis Kasus & Nominal Manfaat per Cabang di Kanwil: {', '.join(selected_kanwil)}")
         group_col = "Nama Kantor Pelayanan (Cabang)"
 
         if not tab1_source.empty and group_col in tab1_source.columns:
