@@ -611,7 +611,7 @@ with tab1:
                 insidetextanchor="start",
                 textfont=dict(size=bar_fonts, color="#1e3a8a", family="Inter, sans-serif"),
                 customdata=kanwil_summary[group_col],
-                hovertemplate="<b>%{customdata}</b><br>Jumlah Kasus: <b>%{y:,} kasus</b><extras></extras>",
+                hovertemplate="<b>%{customdata}</b><br>Jumlah Kasus: <b>%{y:,} kasus</b>",
                 yaxis="y"
             ))
 
@@ -626,7 +626,7 @@ with tab1:
                 textposition="top center",
                 textfont=dict(size=9.5, color="#065f46", family="Inter, sans-serif"),
                 customdata=np.stack([kanwil_summary[group_col], formatted_hover_nominal], axis=-1),
-                hovertemplate="<b>%{customdata[0]}</b><br>Total Nominal Manfaat: <b>%{customdata[1]}</b><extras></extras>",
+                hovertemplate="<b>%{customdata[0]}</b><br>Total Nominal Manfaat: <b>%{customdata[1]}</b>",
                 yaxis="y2"
             ))
 
@@ -706,8 +706,7 @@ with tab1:
                 insidetextanchor="middle",
                 textfont=dict(size=11, color="white", family="Inter, sans-serif"),
                 customdata=np.stack([branch_names, kasus_vals], axis=-1),
-                hovertemplate="Cabang: <b>%{customdata[0]}</b><br>Jumlah Kasus: <b>%{customdata[1]:,} kasus</b><extras></extras>"
-            ), row=1, col=1)
+                hovertemplate="Cabang: <b>%{customdata[0]}</b><br>Jumlah Kasus: <b>%{customdata[1]:,} kasus), row=1, col=1)
 
             fig_pyramid.add_trace(go.Bar(
                 y=branch_names,
