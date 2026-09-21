@@ -560,7 +560,12 @@ with tab1:
         tab1_source = pd.DataFrame()
 
     if not selected_kanwil:
-        st.markdown("### Analisis Kasus & Nominal Manfaat per Kanwil Pelayanan")
+        if selected_branch:
+            branch_str = ", ".join(selected_branch)
+            st.markdown(f"### Analisis Kasus & Nominal Manfaat per Cabang di Cabang: {branch_str}")
+        else:
+            st.markdown("### Analisis Kasus & Nominal Manfaat per Kanwil Pelayanan")
+        
         group_col = "Nama Kanwil Pelayanan"
         
         if not tab1_source.empty and group_col in tab1_source.columns:
@@ -605,7 +610,7 @@ with tab1:
                 x=wrapped_names,
                 y=kanwil_summary["Jumlah_Kasus"],
                 name="Jumlah Kasus",
-                marker=dict(color="#60a5fa", opacity=0.9),
+                marker=dict(color="#fbbf24", opacity=0.9),
                 text=[f"{format_number(c)}" for c in kanwil_summary["Jumlah_Kasus"]],
                 textposition="inside",
                 insidetextanchor="start",
@@ -671,7 +676,11 @@ with tab1:
 
     else:
         kanwil_str = ", ".join(selected_kanwil)
-        st.markdown(f"### Analisis Kasus & Nominal Manfaat per Cabang di Kanwil: {kanwil_str}")
+        if selected_branch:
+            branch_str = ", ".join(selected_branch)
+            st.markdown(f"### Analisis Kasus & Nominal Manfaat per Cabang di Kanwil: {kanwil_str} | Cabang: {branch_str}")
+        else:
+            st.markdown(f"### Analisis Kasus & Nominal Manfaat per Cabang di Kanwil: {kanwil_str}")
         group_col = "Nama Kantor Pelayanan (Cabang)"
 
         if not tab1_source.empty and group_col in tab1_source.columns:
@@ -753,9 +762,15 @@ with tab1:
     st.markdown("<hr style='margin: 15px 0 30px 0; border-color: #e2e8f0;'>", unsafe_allow_html=True)
     
     if not selected_kanwil:
-        st.markdown("### Detail Jumlah Kasus, Nominal & Rata-rata di Masing-masing Kanwil")
+        if selected_branch:
+            branch_str = "Cabang: " + ", ".join(selected_branch)
+            st.markdown(f"### Detail Jumlah Kasus, Nominal & Rata-rata | {branch_str}")
+        else:
+            st.markdown("### Detail Jumlah Kasus, Nominal & Rata-rata di Masing-masing Kanwil")
     else:
-        st.markdown("### Detail Jumlah Kasus, Nominal & Rata-rata di Masing-masing Cabang")
+        kanwil_str = "Kanwil: " + ", ".join(selected_kanwil)
+        branch_str = f" | Cabang: {', '.join(selected_branch)}" if selected_branch else ""
+        st.markdown(f"### Detail Jumlah Kasus, Nominal & Rata-rata di Masing-masing Cabang | {kanwil_str}{branch_str}")
 
     if not tab1_source.empty:
         if not selected_kanwil:
@@ -790,16 +805,23 @@ with tab1:
 
 with tab2:
     if "Sektor BPS Final" in filtered.columns:
+        active_filters_list = []
+        if selected_kanwil:
+            active_filters_list.append(f"Kanwil: {', '.join(selected_kanwil)}")
+        if selected_branch:
+            active_filters_list.append(f"Cabang: {', '.join(selected_branch)}")
         if selected_sector:
-            sector_title_suffix = f" di Sektor BPS: {', '.join(selected_sector)}"
-        elif selected_branch:
-            sector_title_suffix = f" di Cabang: {', '.join(selected_branch)}"
-        elif selected_kanwil:
-            sector_title_suffix = f" di Kanwil: {', '.join(selected_kanwil)}"
-        else:
-            sector_title_suffix = ""
+            active_filters_list.append(f"Sektor BPS: {', '.join(selected_sector)}")
+        if selected_gender:
+            active_filters_list.append(f"Jenis Kelamin: {', '.join(selected_gender)}")
+        if selected_age_groups:
+            active_filters_list.append(f"Range Usia: {', '.join(selected_age_groups)}")
+        if selected_location:
+            active_filters_list.append(f"Lokus: {', '.join(selected_location)}")
+        
+        filter_suffix = f" ({' | '.join(active_filters_list)})" if active_filters_list else ""
 
-        st.markdown(f"### Top 15 Sektor BPS Berdasarkan Jumlah Kasus & Nominal Manfaat{sector_title_suffix}")
+        st.markdown(f"### Top 15 Sektor BPS Berdasarkan Jumlah Kasus & Nominal Manfaat{filter_suffix}")
         
         bps_data = pd.pivot_table(
             filtered,
@@ -935,17 +957,24 @@ with tab2:
 # ============================================================
 
 with tab3:
+    active_filters_list = []
+    if selected_kanwil:
+        active_filters_list.append(f"Kanwil: {', '.join(selected_kanwil)}")
     if selected_branch:
-        profile_title_suffix = f" di Cabang: {', '.join(selected_branch)}"
-    elif selected_kanwil:
-        profile_title_suffix = f" di Kanwil: {', '.join(selected_kanwil)}"
-    elif selected_sector:
-        profile_title_suffix = f" di Sektor BPS: {', '.join(selected_sector)}"
-    else:
-        profile_title_suffix = ""
+        active_filters_list.append(f"Cabang: {', '.join(selected_branch)}")
+    if selected_sector:
+        active_filters_list.append(f"Sektor BPS: {', '.join(selected_sector)}")
+    if selected_gender:
+        active_filters_list.append(f"Jenis Kelamin: {', '.join(selected_gender)}")
+    if selected_age_groups:
+        active_filters_list.append(f"Range Usia: {', '.join(selected_age_groups)}")
+    if selected_location:
+        active_filters_list.append(f"Lokus: {', '.join(selected_location)}")
+    
+    profile_filter_suffix = f" ({' | '.join(active_filters_list)})" if active_filters_list else ""
 
     if "Range Usia" in filtered.columns:
-        st.markdown(f"### Persentase Distribusi Range Usia Tenaga Kerja{profile_title_suffix}")
+        st.markdown(f"### Persentase Distribusi Range Usia Tenaga Kerja{profile_filter_suffix}")
         
         age_agg = pd.pivot_table(
             filtered,
@@ -1037,7 +1066,7 @@ with tab3:
             col1, col2 = st.columns([1, 1])
 
             with col1:
-                st.markdown(f"### Rasio Kasus Berdasarkan Jenis Kelamin{profile_title_suffix}")
+                st.markdown(f"### Rasio Kasus Berdasarkan Jenis Kelamin{profile_filter_suffix}")
                 fig_gender = px.pie(
                     gender_agg,
                     names="Jenis Kelamin",
@@ -1064,11 +1093,11 @@ with tab3:
                 gender_display["Total_Nominal"] = gender_display["Total_Nominal"].apply(format_currency)
                 gender_display["Persentase (%)"] = gender_display["Persentase (%)"].astype(str).str.replace(".", ",") + " %"
 
-                st.markdown(f"### Tabel Ringkasan Rasio Jenis Kelamin{profile_title_suffix}")
+                st.markdown(f"### Tabel Ringkasan Rasio Jenis Kelamin{profile_filter_suffix}")
                 st.dataframe(gender_display, use_container_width=True, hide_index=True)
 
     st.markdown("<hr style='margin: 30px 0; border-color: #e2e8f0;'>", unsafe_allow_html=True)
-    st.markdown(f"### Jam Kecelakaan & Lokus Kejadian{profile_title_suffix}")
+    st.markdown(f"### Jam Kecelakaan & Lokus Kejadian{profile_filter_suffix}")
 
     col1, col2 = st.columns(2)
 
@@ -1149,7 +1178,7 @@ with tab3:
                 )
 
     st.markdown("<hr style='margin: 30px 0; border-color: #e2e8f0;'>", unsafe_allow_html=True)
-    st.markdown(f"### Sumber Cedera, Bagian Sakit & Kondisi Akhir Pekerja{profile_title_suffix}")
+    st.markdown(f"### Sumber Cedera, Bagian Sakit & Kondisi Akhir Pekerja{profile_filter_suffix}")
 
     col1, col2 = st.columns(2)
 
@@ -1229,7 +1258,7 @@ with tab3:
 
     if "Kondisi Akhir" in filtered.columns:
         st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown(f"### Distribusi Kondisi Akhir Pekerja (Funnel Chart){profile_title_suffix}")
+        st.markdown(f"### Distribusi Kondisi Akhir Pekerja (Funnel Chart){profile_filter_suffix}")
         
         cond_data = pd.pivot_table(
             filtered,
