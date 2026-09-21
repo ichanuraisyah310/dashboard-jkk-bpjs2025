@@ -807,7 +807,7 @@ with tab2:
                 suggested_max_y_bps = 100
                 dynamic_dtick_bps = 20
             else:
-                suggested_max_y_bps = max_case_bps * 1.1
+                suggested_max_y_bps = max_case_bps * 1.15
                 if max_case_bps > 20000:
                     dynamic_dtick_bps = 5000
                 elif max_case_bps > 5000:
@@ -820,7 +820,7 @@ with tab2:
                     dynamic_dtick_bps = 20
 
             max_nominal_val = bps_data["Total_Nominal"].max() if not bps_data["Total_Nominal"].empty else 100
-            suggested_max_y2 = max_nominal_val * 1.1
+            suggested_max_y2 = max_nominal_val * 1.15
 
             fig_dual = go.Figure()
 
@@ -829,10 +829,9 @@ with tab2:
                 y=bps_data["Jumlah_Kasus"],
                 name="Jumlah Kasus",
                 marker=dict(color="#60a5fa", opacity=0.9),
-                text=[f"{format_number(c)} kasus" for c in bps_data["Jumlah_Kasus"]],
-                textposition="inside",
-                insidetextanchor="start",
-                textfont=dict(size=bar_fonts, color="#1e3a8a", family="Inter, sans-serif"),
+                text=[f"{format_number(c)}" for c in bps_data["Jumlah_Kasus"]],
+                textposition="outside",
+                textfont=dict(size=9.5, color="#1e3a8a", family="Inter, sans-serif"),
                 customdata=bps_data["Sektor BPS Final"],
                 hovertemplate="Sektor: <b>%{customdata}</b><br>Jumlah Kasus: <b>%{y:,} kasus</b><extra></extra>",
                 yaxis="y"
@@ -856,27 +855,32 @@ with tab2:
             fig_dual.update_layout(
                 template=chart_theme,
                 height=880,
-                margin=dict(l=50, r=50, t=20, b=90),
+                margin=dict(l=50, r=50, t=40, b=90),
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)',
                 xaxis=dict(
                     title="",
                     tickangle=0,
+                    showticklabels=True,
+                    showgrid=False,
+                    zeroline=False,
                     tickfont=dict(size=8.5, color="#0f172a", family="Inter, sans-serif")
                 ),
                 yaxis=dict(
-                    title=dict(text="Jumlah Kasus", font=dict(color="#334155")),
-                    gridcolor="#cbd5e1",
-                    zeroline=True,
+                    title="",
+                    showticklabels=False,
+                    showgrid=False,
+                    zeroline=False,
                     side="left",
                     rangemode="tozero",
                     range=[0, suggested_max_y_bps],
                     dtick=dynamic_dtick_bps
                 ),
                 yaxis2=dict(
-                    title=dict(text="Total Nominal Manfaat (Rp)", font=dict(color="#1d4ed8")),
+                    title="",
                     overlaying="y",
                     side="right",
+                    showticklabels=False,
                     showgrid=False,
                     zeroline=False,
                     rangemode="tozero",
@@ -1144,12 +1148,18 @@ with tab3:
                     title="Top 10 Sumber Cedera",
                     color_discrete_sequence=["#7c3aed"],
                     template=chart_theme,
+                    text=[format_number(c) for c in source_data["Jumlah_Kasus"]]
+                )
+                fig.update_traces(
+                    textposition="outside",
+                    textfont=dict(size=11, color="#1e293b", family="Inter, sans-serif")
                 )
                 fig.update_layout(
-                    xaxis_title="Jumlah Kasus",
-                    yaxis_title="",
+                    xaxis=dict(showticklabels=False, showgrid=False, zeroline=False, title=""),
+                    yaxis=dict(showticklabels=True, title=""),
                     paper_bgcolor='rgba(0,0,0,0)',
-                    plot_bgcolor='rgba(0,0,0,0)'
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    margin=dict(t=40, b=20, l=20, r=40)
                 )
                 st.plotly_chart(fig, use_container_width=True)
 
@@ -1175,12 +1185,18 @@ with tab3:
                     title="Top 10 Bagian Tubuh yang Sakit",
                     color_discrete_sequence=["#059669"],
                     template=chart_theme,
+                    text=[format_number(c) for c in body_data["Jumlah_Kasus"]]
+                )
+                fig.update_traces(
+                    textposition="outside",
+                    textfont=dict(size=11, color="#1e293b", family="Inter, sans-serif")
                 )
                 fig.update_layout(
-                    xaxis_title="Jumlah Kasus",
-                    yaxis_title="",
+                    xaxis=dict(showticklabels=False, showgrid=False, zeroline=False, title=""),
+                    yaxis=dict(showticklabels=True, title=""),
                     paper_bgcolor='rgba(0,0,0,0)',
-                    plot_bgcolor='rgba(0,0,0,0)'
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    margin=dict(t=40, b=20, l=20, r=40)
                 )
                 st.plotly_chart(fig, use_container_width=True)
 
