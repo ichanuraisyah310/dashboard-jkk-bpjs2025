@@ -616,7 +616,7 @@ with tab1:
                 insidetextanchor="start",
                 textfont=dict(size=bar_fonts, color="#1e3a8a", family="Inter, sans-serif"),
                 customdata=kanwil_summary[group_col],
-                hovertemplate="<b>%{customdata}</b><br>Jumlah Kasus: <b>%{y:,} kasus</b><extras></extras>",
+                hovertemplate="<b>%{customdata}</b><br>Jumlah Kasus: <b>%{y:,} kasus</b>",
                 yaxis="y"
             ))
 
@@ -631,7 +631,7 @@ with tab1:
                 textposition="top center",
                 textfont=dict(size=9.5, color="#065f46", family="Inter, sans-serif"),
                 customdata=np.stack([kanwil_summary[group_col], formatted_hover_nominal], axis=-1),
-                hovertemplate="<b>%{customdata[0]}</b><br>Total Nominal Manfaat: <b>%{customdata[1]}</b><extras></extras>",
+                hovertemplate="<b>%{customdata[0]}</b><br>Total Nominal Manfaat: <b>%{customdata[1]}</b>",
                 yaxis="y2"
             ))
 
@@ -715,7 +715,7 @@ with tab1:
                 insidetextanchor="middle",
                 textfont=dict(size=11, color="white", family="Inter, sans-serif"),
                 customdata=np.stack([branch_names, kasus_vals], axis=-1),
-                hovertemplate="Cabang: <b>%{customdata[0]}</b><br>Jumlah Kasus: <b>%{customdata[1]:,} kasus</b><extras></extras>"
+                hovertemplate="Cabang: <b>%{customdata[0]}</b><br>Jumlah Kasus: <b>%{customdata[1]:,} kasus</b>"
             ), row=1, col=1)
 
             fig_pyramid.add_trace(go.Bar(
@@ -729,7 +729,7 @@ with tab1:
                 insidetextanchor="middle",
                 textfont=dict(size=11, color="white", family="Inter, sans-serif"),
                 customdata=np.stack([branch_names, formatted_hover_nominal], axis=-1),
-                hovertemplate="Cabang: <b>%{customdata[0]}</b><br>Total Nominal Manfaat: <b>%{customdata[1]}</b><extras></extras>"
+                hovertemplate="Cabang: <b>%{customdata[0]}</b><br>Total Nominal Manfaat: <b>%{customdata[1]}</b>"
             ), row=1, col=2)
 
             fig_pyramid.update_layout(
@@ -873,7 +873,7 @@ with tab2:
                 insidetextanchor="start",
                 textfont=dict(size=9.5, color="#1e3a8a", family="Inter, sans-serif"),
                 customdata=bps_data["Sektor BPS Final"],
-                hovertemplate="Sektor: <b>%{customdata}</b><br>Jumlah Kasus: <b>%{y:,} kasus</b><extras></extras>",
+                hovertemplate="Sektor: <b>%{customdata}</b><br>Jumlah Kasus: <b>%{y:,} kasus</b>",
                 yaxis="y"
             ))
 
@@ -888,7 +888,7 @@ with tab2:
                 textposition="top center",
                 textfont=dict(size=10, color="#065f46", family="Inter, sans-serif"),
                 customdata=np.stack([bps_data["Sektor BPS Final"], formatted_hover_nominal], axis=-1),
-                hovertemplate="Sektor: <b>%{customdata[0]}</b><br>Total Nominal Manfaat: <b>%{customdata[1]}</b><extras></extras>",
+                hovertemplate="Sektor: <b>%{customdata[0]}</b><br>Total Nominal Manfaat: <b>%{customdata[1]}</b>",
                 yaxis="y2"
             ))
 
@@ -1017,7 +1017,7 @@ with tab3:
                         age_agg["Jumlah_Kasus"].apply(format_number),
                         age_agg["Persentase"].astype(str)
                     ], axis=-1),
-                    hovertemplate="<b>Range Usia:</b> %{label}<br><b>Jumlah Kasus:</b> %{customdata[0]} kasus<br><b>Persentase:</b> %{customdata[1]}%<extras></extras>"
+                    hovertemplate="<b>Range Usia:</b> %{label}<br><b>Jumlah Kasus:</b> %{customdata[0]} kasus<br><b>Persentase:</b> %{customdata[1]}%"
                 )
                 fig_pie.update_layout(
                     paper_bgcolor='rgba(0,0,0,0)',
@@ -1291,7 +1291,7 @@ with tab3:
                     cond_data["Formatted_Cases"],
                     cond_data["Persen"]
                 ], axis=-1),
-                hovertemplate="<b>%{customdata[0]}</b><br>Jumlah Kasus: <b>%{customdata[1]} kasus</b><br>Persentase: <b>%{customdata[2]}%</b><extras></extras>"
+                hovertemplate="<b>%{customdata[0]}</b><br>Jumlah Kasus: <b>%{customdata[1]} kasus</b><br>Persentase: <b>%{customdata[2]}%</b>"
             ))
             
             annotations = []
