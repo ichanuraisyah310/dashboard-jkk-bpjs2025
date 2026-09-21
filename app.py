@@ -618,7 +618,7 @@ with tab1:
                 marker=dict(size=10, color="#059669", line=dict(color="#ffffff", width=2)),
                 text=compact_labels,
                 textposition="top center",
-                textfont=dict(size=10, color="#065f46", family="Inter, sans-serif"),
+                textfont=dict(size=8, color="#065f46", family="Inter, sans-serif"),
                 customdata=np.stack([kanwil_summary[group_col], formatted_hover_nominal], axis=-1),
                 hovertemplate="<b>%{customdata[0]}</b><br>Total Nominal Manfaat: <b>%{customdata[1]}</b><extra></extra>",
                 yaxis="y2"
@@ -632,22 +632,27 @@ with tab1:
                 plot_bgcolor='rgba(0,0,0,0)',
                 xaxis=dict(
                     title="",
+                    showticklabels=True,
+                    showgrid=False,
+                    zeroline=False,
                     tickangle=0,
                     tickfont=dict(size=8.5, color="#0f172a", family="Inter, sans-serif")
                 ),
                 yaxis=dict(
-                    title=dict(text="Jumlah Kasus", font=dict(color="#334155")),
-                    gridcolor="#cbd5e1",
-                    zeroline=True,
+                    title="",
+                    showticklabels=False,
+                    showgrid=False,
+                    zeroline=False,
                     side="left",
                     rangemode="tozero",
                     range=[0, suggested_max_y_kanwil],
                     dtick=dynamic_dtick_kanwil
                 ),
                 yaxis2=dict(
-                    title=dict(text="Total Nominal Manfaat (Rp)", font=dict(color="#059669")),
+                    title="",
                     overlaying="y",
                     side="right",
+                    showticklabels=False,
                     showgrid=False,
                     zeroline=False,
                     rangemode="tozero",
