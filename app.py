@@ -600,7 +600,7 @@ with tab1:
                 y=kanwil_summary["Jumlah_Kasus"],
                 name="Jumlah Kasus",
                 marker=dict(color="#fb923c", opacity=0.9),
-                text=[f"{format_number(c)} kasus" for c in kanwil_summary["Jumlah_Kasus"]],
+                text=[f"{format_number(c)}" for c in kanwil_summary["Jumlah_Kasus"]],
                 textposition="inside",
                 insidetextanchor="start",
                 textfont=dict(size=bar_fonts, color="#7c2d12", family="Inter, sans-serif"),
@@ -673,7 +673,7 @@ with tab1:
             kasus_vals = branch_summary["Jumlah_Kasus"].tolist()
             nominal_vals = branch_summary["Total_Nominal"].tolist()
 
-            kasus_text = [f"{format_number(c)} kasus" for c in kasus_vals]
+            kasus_text = [f"{format_number(c)}" for c in kasus_vals]
             nominal_text = [format_currency_compact_intl(n) for n in nominal_vals]
             formatted_hover_nominal = [format_currency(n) for n in nominal_vals]
 
