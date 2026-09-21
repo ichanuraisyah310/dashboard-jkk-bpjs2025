@@ -132,7 +132,7 @@ st.markdown(
     div[data-testid="stMetric"] {
         background-color: #ffffff;
         border-radius: 10px;
-        padding: 12px 14px;
+        padding: 12px 16px;
         border: 1px solid #e2e8f0;
         box-shadow: 0 2px 6px 0 rgba(15, 23, 42, 0.02);
     }
@@ -501,25 +501,6 @@ if selected_age_groups and "Range Usia" in filtered.columns:
 if selected_location and "Nama Lokasi Kecelakaan Final" in filtered.columns:
     filtered = filtered[filtered["Nama Lokasi Kecelakaan Final"].isin(selected_location)]
 
-# Buat String Keterangan Filter Aktif untuk Ditampilkan di Sub-judul Grafik
-active_filters_desc = []
-if selected_year:
-    active_filters_desc.append(f"Tahun: {', '.join(map(str, selected_year))}")
-if selected_kanwil:
-    active_filters_desc.append(f"Kanwil: {', '.join(selected_kanwil)}")
-if selected_branch:
-    active_filters_desc.append(f"Cabang: {', '.join(selected_branch)}")
-if selected_gender:
-    active_filters_desc.append(f"Jenis Kelamin: {', '.join(selected_gender)}")
-if selected_sector:
-    active_filters_desc.append(f"Sektor BPS: {', '.join(selected_sector)}")
-if selected_age_groups:
-    active_filters_desc.append(f"Range Usia: {', '.join(selected_age_groups)}")
-if selected_location:
-    active_filters_desc.append(f"Lokus: {', '.join(selected_location)}")
-
-filter_info_text = f"<b>Filter Aktif:</b> {' | '.join(active_filters_desc)}" if active_filters_desc else "<b>Filter Aktif:</b> Keseluruhan Data (Tanpa Filter Spesifik)"
-
 
 # ============================================================
 # TITLE & KPI METRICS
@@ -569,6 +550,7 @@ chart_theme = "plotly_white"
 # ============================================================
 
 with tab1:
+    # Tab 1 hanya dikontrol oleh filter Kanwil dan Cabang (mengabaikan filter lain seperti tahun, gender, dll untuk data grouping)
     if not df_grouping.empty:
         tab1_source = df_grouping.copy()
         if selected_kanwil and "Nama Kanwil Pelayanan" in tab1_source.columns:
@@ -580,7 +562,6 @@ with tab1:
 
     if not selected_kanwil:
         st.markdown("### Analisis Kasus & Nominal Manfaat per Kanwil Pelayanan")
-        st.markdown(f"<p style='color: #64748b; font-size: 13px; margin-top: -10px; margin-bottom: 15px;'>{filter_info_text}</p>", unsafe_allow_html=True)
         group_col = "Nama Kanwil Pelayanan"
         
         if not tab1_source.empty and group_col in tab1_source.columns:
@@ -621,7 +602,6 @@ with tab1:
 
             fig_dual_kanwil = go.Figure()
 
-            # Jumlah Kasus (Bar) - Keterangan di dalam/bawah batang, Warna Legenda Biru
             fig_dual_kanwil.add_trace(go.Bar(
                 x=wrapped_names,
                 y=kanwil_summary["Jumlah_Kasus"],
@@ -636,7 +616,6 @@ with tab1:
                 yaxis="y"
             ))
 
-            # Total Nominal Manfaat (Line & Markers) - Warna Hijau, Warna Legenda Hijau
             fig_dual_kanwil.add_trace(go.Scatter(
                 x=wrapped_names,
                 y=kanwil_summary["Total_Nominal"],
@@ -692,8 +671,8 @@ with tab1:
             st.plotly_chart(fig_dual_kanwil, use_container_width=True)
 
     else:
-        st.markdown(f"### Analisis Kasus & Nominal Manfaat per Cabang di Kanwil: {', '.join(selected_kanwil)} (Data Grouping)")
-        st.markdown(f"<p style='color: #64748b; font-size: 13px; margin-top: -10px; margin-bottom: 15px;'>{filter_info_text}</p>", unsafe_allow_html=True)
+        kanwil_str = ", ".join(selected_kanwil)
+        st.markdown(f"### Analisis Kasus & Nominal Manfaat per Cabang di Kanwil: {kanwil_str} (Data Grouping)")
         group_col = "Nama Kantor Pelayanan (Cabang)"
 
         if not tab1_source.empty and group_col in tab1_source.columns:
@@ -812,8 +791,8 @@ with tab1:
 
 with tab2:
     if "Sektor BPS Final" in filtered.columns:
-        st.markdown("### Top 15 Sektor BPS Berdasarkan Jumlah Kasus & Nominal Manfaat")
-        st.markdown(f"<p style='color: #64748b; font-size: 13px; margin-top: -10px; margin-bottom: 15px;'>{filter_info_text}</p>", unsafe_allow_html=True)
+        sector_title_suffix = f" (Filter Sektor: {', '.join(selected_sector)})" if selected_sector else ""
+        st.markdown(f"### Top 15 Sektor BPS Berdasarkan Jumlah Kasus & Nominal Manfaat{sector_title_suffix}")
         
         bps_data = pd.pivot_table(
             filtered,
@@ -855,7 +834,6 @@ with tab2:
 
             fig_dual = go.Figure()
 
-            # Jumlah Kasus (Bar) - Keterangan di dalam/bawah batang, Warna Legenda Biru
             fig_dual.add_trace(go.Bar(
                 x=wrapped_sector_names,
                 y=bps_data["Jumlah_Kasus"],
@@ -870,7 +848,6 @@ with tab2:
                 yaxis="y"
             ))
 
-            # Total Nominal Manfaat (Line & Markers) - Warna Hijau, Warna Legenda Hijau
             fig_dual.add_trace(go.Scatter(
                 x=wrapped_sector_names,
                 y=bps_data["Total_Nominal"],
