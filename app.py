@@ -971,13 +971,13 @@ with tab3:
     if selected_location:
         active_filters_list.append(f"Lokus: {', '.join(selected_location)}")
     
-    profile_filter_suffix = f" ({' | '.join(active_filters_list)})" if active_filters_list else ""
+    profile_filter_suffix = f"({', '.join(active_filters_list)})" if active_filters_list else "(Semua Data)"
 
-    # Menampilkan satu judul informasi filter lengkap di paling atas halaman Profil Kecelakaan
+    # Menampilkan judul informasi filter sederhana tanpa background biru
     st.markdown(
         f"""
-        <div style="font-size: 14px; font-weight: 700; color: #1e3a8a; background-color: #eff6ff; padding: 10px 16px; border-radius: 8px; border-left: 4px solid #1d4ed8; margin-bottom: 25px;">
-            📊 Filter Aktif: {profile_filter_suffix if active_filters_list else "Semua Data (Tanpa Filter)"}
+        <div style="font-size: 14px; font-weight: 700; color: #1e3a8a; margin-bottom: 25px;">
+            Informasi Filter: {profile_filter_suffix}
         </div>
         """,
         unsafe_allow_html=True
