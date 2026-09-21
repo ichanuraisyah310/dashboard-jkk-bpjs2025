@@ -501,6 +501,25 @@ if selected_age_groups and "Range Usia" in filtered.columns:
 if selected_location and "Nama Lokasi Kecelakaan Final" in filtered.columns:
     filtered = filtered[filtered["Nama Lokasi Kecelakaan Final"].isin(selected_location)]
 
+# Buat String Keterangan Filter Aktif untuk Ditampilkan di Sub-judul Grafik
+active_filters_desc = []
+if selected_year:
+    active_filters_desc.append(f"Tahun: {', '.join(map(str, selected_year))}")
+if selected_kanwil:
+    active_filters_desc.append(f"Kanwil: {', '.join(selected_kanwil)}")
+if selected_branch:
+    active_filters_desc.append(f"Cabang: {', '.join(selected_branch)}")
+if selected_gender:
+    active_filters_desc.append(f"Jenis Kelamin: {', '.join(selected_gender)}")
+if selected_sector:
+    active_filters_desc.append(f"Sektor BPS: {', '.join(selected_sector)}")
+if selected_age_groups:
+    active_filters_desc.append(f"Range Usia: {', '.join(selected_age_groups)}")
+if selected_location:
+    active_filters_desc.append(f"Lokus: {', '.join(selected_location)}")
+
+filter_info_text = f"<b>Filter Aktif:</b> {' | '.join(active_filters_desc)}" if active_filters_desc else "<b>Filter Aktif:</b> Keseluruhan Data (Tanpa Filter Spesifik)"
+
 
 # ============================================================
 # TITLE & KPI METRICS
@@ -561,6 +580,7 @@ with tab1:
 
     if not selected_kanwil:
         st.markdown("### Analisis Kasus & Nominal Manfaat per Kanwil Pelayanan")
+        st.markdown(f"<p style='color: #64748b; font-size: 13px; margin-top: -10px; margin-bottom: 15px;'>{filter_info_text}</p>", unsafe_allow_html=True)
         group_col = "Nama Kanwil Pelayanan"
         
         if not tab1_source.empty and group_col in tab1_source.columns:
@@ -601,20 +621,22 @@ with tab1:
 
             fig_dual_kanwil = go.Figure()
 
+            # Jumlah Kasus (Bar) - Keterangan di dalam/bawah batang, Warna Legenda Biru
             fig_dual_kanwil.add_trace(go.Bar(
                 x=wrapped_names,
                 y=kanwil_summary["Jumlah_Kasus"],
                 name="Jumlah Kasus",
-                marker=dict(color="#fb923c", opacity=0.9),
+                marker=dict(color="#60a5fa", opacity=0.9),
                 text=[f"{format_number(c)}" for c in kanwil_summary["Jumlah_Kasus"]],
                 textposition="inside",
                 insidetextanchor="start",
-                textfont=dict(size=bar_fonts, color="#7c2d12", family="Inter, sans-serif"),
+                textfont=dict(size=bar_fonts, color="#1e3a8a", family="Inter, sans-serif"),
                 customdata=kanwil_summary[group_col],
-                hovertemplate="<b>%{customdata}</b><br>Jumlah Kasus: <b>%{y:,} kasus</b><extra></extra>",
+                hovertemplate="<b>%{customdata}</b><br>Jumlah Kasus: <b>%{y:,} kasus</b><extras></extras>",
                 yaxis="y"
             ))
 
+            # Total Nominal Manfaat (Line & Markers) - Warna Hijau, Warna Legenda Hijau
             fig_dual_kanwil.add_trace(go.Scatter(
                 x=wrapped_names,
                 y=kanwil_summary["Total_Nominal"],
@@ -624,9 +646,9 @@ with tab1:
                 marker=dict(size=10, color="#059669", line=dict(color="#ffffff", width=2)),
                 text=compact_labels,
                 textposition="top center",
-                textfont=dict(size=8, color="#065f46", family="Inter, sans-serif"),
+                textfont=dict(size=9.5, color="#065f46", family="Inter, sans-serif"),
                 customdata=np.stack([kanwil_summary[group_col], formatted_hover_nominal], axis=-1),
-                hovertemplate="<b>%{customdata[0]}</b><br>Total Nominal Manfaat: <b>%{customdata[1]}</b><extra></extra>",
+                hovertemplate="<b>%{customdata[0]}</b><br>Total Nominal Manfaat: <b>%{customdata[1]}</b><extras></extras>",
                 yaxis="y2"
             ))
 
@@ -671,6 +693,7 @@ with tab1:
 
     else:
         st.markdown(f"### Analisis Kasus & Nominal Manfaat per Cabang di Kanwil: {', '.join(selected_kanwil)} (Data Grouping)")
+        st.markdown(f"<p style='color: #64748b; font-size: 13px; margin-top: -10px; margin-bottom: 15px;'>{filter_info_text}</p>", unsafe_allow_html=True)
         group_col = "Nama Kantor Pelayanan (Cabang)"
 
         if not tab1_source.empty and group_col in tab1_source.columns:
@@ -705,7 +728,7 @@ with tab1:
                 insidetextanchor="middle",
                 textfont=dict(size=11, color="white", family="Inter, sans-serif"),
                 customdata=np.stack([branch_names, kasus_vals], axis=-1),
-                hovertemplate="Cabang: <b>%{customdata[0]}</b><br>Jumlah Kasus: <b>%{customdata[1]:,} kasus</b><extra></extra>"
+                hovertemplate="Cabang: <b>%{customdata[0]}</b><br>Jumlah Kasus: <b>%{customdata[1]:,} kasus</b><extras></extras>"
             ), row=1, col=1)
 
             fig_pyramid.add_trace(go.Bar(
@@ -719,7 +742,7 @@ with tab1:
                 insidetextanchor="middle",
                 textfont=dict(size=11, color="white", family="Inter, sans-serif"),
                 customdata=np.stack([branch_names, formatted_hover_nominal], axis=-1),
-                hovertemplate="Cabang: <b>%{customdata[0]}</b><br>Total Nominal Manfaat: <b>%{customdata[1]}</b><extra></extra>"
+                hovertemplate="Cabang: <b>%{customdata[0]}</b><br>Total Nominal Manfaat: <b>%{customdata[1]}</b><extras></extras>"
             ), row=1, col=2)
 
             fig_pyramid.update_layout(
@@ -790,6 +813,8 @@ with tab1:
 with tab2:
     if "Sektor BPS Final" in filtered.columns:
         st.markdown("### Top 15 Sektor BPS Berdasarkan Jumlah Kasus & Nominal Manfaat")
+        st.markdown(f"<p style='color: #64748b; font-size: 13px; margin-top: -10px; margin-bottom: 15px;'>{filter_info_text}</p>", unsafe_allow_html=True)
+        
         bps_data = pd.pivot_table(
             filtered,
             index="Sektor BPS Final",
@@ -830,31 +855,34 @@ with tab2:
 
             fig_dual = go.Figure()
 
+            # Jumlah Kasus (Bar) - Keterangan di dalam/bawah batang, Warna Legenda Biru
             fig_dual.add_trace(go.Bar(
                 x=wrapped_sector_names,
                 y=bps_data["Jumlah_Kasus"],
                 name="Jumlah Kasus",
                 marker=dict(color="#60a5fa", opacity=0.9),
                 text=[f"{format_number(c)}" for c in bps_data["Jumlah_Kasus"]],
-                textposition="outside",
+                textposition="inside",
+                insidetextanchor="start",
                 textfont=dict(size=9.5, color="#1e3a8a", family="Inter, sans-serif"),
                 customdata=bps_data["Sektor BPS Final"],
-                hovertemplate="Sektor: <b>%{customdata}</b><br>Jumlah Kasus: <b>%{y:,} kasus</b><extra></extra>",
+                hovertemplate="Sektor: <b>%{customdata}</b><br>Jumlah Kasus: <b>%{y:,} kasus</b><extras></extras>",
                 yaxis="y"
             ))
 
+            # Total Nominal Manfaat (Line & Markers) - Warna Hijau, Warna Legenda Hijau
             fig_dual.add_trace(go.Scatter(
                 x=wrapped_sector_names,
                 y=bps_data["Total_Nominal"],
                 name="Total Nominal Manfaat",
                 mode="lines+markers+text",
-                line=dict(color="#1d4ed8", width=3.5),
-                marker=dict(size=10, color="#1d4ed8", line=dict(color="#ffffff", width=2)),
+                line=dict(color="#059669", width=3.5),
+                marker=dict(size=10, color="#059669", line=dict(color="#ffffff", width=2)),
                 text=compact_labels,
                 textposition="top center",
-                textfont=dict(size=10, color="#1e3a8a", family="Inter, sans-serif"),
+                textfont=dict(size=10, color="#065f46", family="Inter, sans-serif"),
                 customdata=np.stack([bps_data["Sektor BPS Final"], formatted_hover_nominal], axis=-1),
-                hovertemplate="Sektor: <b>%{customdata[0]}</b><br>Total Nominal Manfaat: <b>%{customdata[1]}</b><extra></extra>",
+                hovertemplate="Sektor: <b>%{customdata[0]}</b><br>Total Nominal Manfaat: <b>%{customdata[1]}</b><extras></extras>",
                 yaxis="y2"
             ))
 
@@ -967,7 +995,7 @@ with tab3:
                         age_agg["Jumlah_Kasus"].apply(format_number),
                         age_agg["Persentase"].astype(str)
                     ], axis=-1),
-                    hovertemplate="<b>Range Usia:</b> %{label}<br><b>Jumlah Kasus:</b> %{customdata[0]} kasus<br><b>Persentase:</b> %{customdata[1]}%<extra></extra>"
+                    hovertemplate="<b>Range Usia:</b> %{label}<br><b>Jumlah Kasus:</b> %{customdata[0]} kasus<br><b>Persentase:</b> %{customdata[1]}%<extras></extras>"
                 )
                 fig_pie.update_layout(
                     paper_bgcolor='rgba(0,0,0,0)',
@@ -1241,7 +1269,7 @@ with tab3:
                     cond_data["Formatted_Cases"],
                     cond_data["Persen"]
                 ], axis=-1),
-                hovertemplate="<b>%{customdata[0]}</b><br>Jumlah Kasus: <b>%{customdata[1]} kasus</b><br>Persentase: <b>%{customdata[2]}%</b><extra></extra>"
+                hovertemplate="<b>%{customdata[0]}</b><br>Jumlah Kasus: <b>%{customdata[1]} kasus</b><br>Persentase: <b>%{customdata[2]}%</b><extras></extras>"
             ))
             
             annotations = []
