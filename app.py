@@ -550,7 +550,6 @@ chart_theme = "plotly_white"
 # ============================================================
 
 with tab1:
-    # Tab 1 hanya dikontrol oleh filter Kanwil dan Cabang (mengabaikan filter lain seperti tahun, gender, dll untuk data grouping)
     if not df_grouping.empty:
         tab1_source = df_grouping.copy()
         if selected_kanwil and "Nama Kanwil Pelayanan" in tab1_source.columns:
@@ -672,7 +671,7 @@ with tab1:
 
     else:
         kanwil_str = ", ".join(selected_kanwil)
-        st.markdown(f"### Analisis Kasus & Nominal Manfaat per Cabang di Kanwil: {kanwil_str} (Data Grouping)")
+        st.markdown(f"### Analisis Kasus & Nominal Manfaat per Cabang di Kanwil: {kanwil_str}")
         group_col = "Nama Kantor Pelayanan (Cabang)"
 
         if not tab1_source.empty and group_col in tab1_source.columns:
@@ -754,9 +753,9 @@ with tab1:
     st.markdown("<hr style='margin: 15px 0 30px 0; border-color: #e2e8f0;'>", unsafe_allow_html=True)
     
     if not selected_kanwil:
-        st.markdown("### Detail Jumlah Kasus, Nominal & Rata-rata di Masing-masing Kanwil (Data Grouping)")
+        st.markdown("### Detail Jumlah Kasus, Nominal & Rata-rata di Masing-masing Kanwil")
     else:
-        st.markdown("### Detail Jumlah Kasus, Nominal & Rata-rata di Masing-masing Cabang (Data Grouping)")
+        st.markdown("### Detail Jumlah Kasus, Nominal & Rata-rata di Masing-masing Cabang")
 
     if not tab1_source.empty:
         if not selected_kanwil:
@@ -791,7 +790,15 @@ with tab1:
 
 with tab2:
     if "Sektor BPS Final" in filtered.columns:
-        sector_title_suffix = f" (Filter Sektor: {', '.join(selected_sector)})" if selected_sector else ""
+        if selected_sector:
+            sector_title_suffix = f" di Sektor BPS: {', '.join(selected_sector)}"
+        elif selected_branch:
+            sector_title_suffix = f" di Cabang: {', '.join(selected_branch)}"
+        elif selected_kanwil:
+            sector_title_suffix = f" di Kanwil: {', '.join(selected_kanwil)}"
+        else:
+            sector_title_suffix = ""
+
         st.markdown(f"### Top 15 Sektor BPS Berdasarkan Jumlah Kasus & Nominal Manfaat{sector_title_suffix}")
         
         bps_data = pd.pivot_table(
@@ -928,8 +935,17 @@ with tab2:
 # ============================================================
 
 with tab3:
+    if selected_branch:
+        profile_title_suffix = f" di Cabang: {', '.join(selected_branch)}"
+    elif selected_kanwil:
+        profile_title_suffix = f" di Kanwil: {', '.join(selected_kanwil)}"
+    elif selected_sector:
+        profile_title_suffix = f" di Sektor BPS: {', '.join(selected_sector)}"
+    else:
+        profile_title_suffix = ""
+
     if "Range Usia" in filtered.columns:
-        st.markdown("### Persentase Distribusi Range Usia Tenaga Kerja")
+        st.markdown(f"### Persentase Distribusi Range Usia Tenaga Kerja{profile_title_suffix}")
         
         age_agg = pd.pivot_table(
             filtered,
@@ -1021,7 +1037,7 @@ with tab3:
             col1, col2 = st.columns([1, 1])
 
             with col1:
-                st.markdown("### Rasio Kasus Berdasarkan Jenis Kelamin")
+                st.markdown(f"### Rasio Kasus Berdasarkan Jenis Kelamin{profile_title_suffix}")
                 fig_gender = px.pie(
                     gender_agg,
                     names="Jenis Kelamin",
@@ -1048,11 +1064,11 @@ with tab3:
                 gender_display["Total_Nominal"] = gender_display["Total_Nominal"].apply(format_currency)
                 gender_display["Persentase (%)"] = gender_display["Persentase (%)"].astype(str).str.replace(".", ",") + " %"
 
-                st.markdown("### Tabel Ringkasan Rasio Jenis Kelamin")
+                st.markdown(f"### Tabel Ringkasan Rasio Jenis Kelamin{profile_title_suffix}")
                 st.dataframe(gender_display, use_container_width=True, hide_index=True)
 
     st.markdown("<hr style='margin: 30px 0; border-color: #e2e8f0;'>", unsafe_allow_html=True)
-    st.markdown("### Jam Kecelakaan & Lokus Kejadian")
+    st.markdown(f"### Jam Kecelakaan & Lokus Kejadian{profile_title_suffix}")
 
     col1, col2 = st.columns(2)
 
@@ -1133,7 +1149,7 @@ with tab3:
                 )
 
     st.markdown("<hr style='margin: 30px 0; border-color: #e2e8f0;'>", unsafe_allow_html=True)
-    st.markdown("### Sumber Cedera, Bagian Sakit & Kondisi Akhir Pekerja")
+    st.markdown(f"### Sumber Cedera, Bagian Sakit & Kondisi Akhir Pekerja{profile_title_suffix}")
 
     col1, col2 = st.columns(2)
 
@@ -1213,7 +1229,7 @@ with tab3:
 
     if "Kondisi Akhir" in filtered.columns:
         st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("### Distribusi Kondisi Akhir Pekerja (Funnel Chart)")
+        st.markdown(f"### Distribusi Kondisi Akhir Pekerja (Funnel Chart){profile_title_suffix}")
         
         cond_data = pd.pivot_table(
             filtered,
