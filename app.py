@@ -282,6 +282,8 @@ def load_and_process_data(file_path):
         df, ["Ket Jam Final", "ket_jam_final", "Ket_Jam_Final", "jam_kecelakaan"]
     )
     range_usia_col_name = get_col(df, ["Range Usia", "range usia", "range_usia", "usia"])
+    npp_col_name = get_col(df, ["NPP", "npp"])
+    perusahaan_col_name = get_col(df, ["Nama Perusahaan", "nama perusahaan", "nama_perusahaan"])
 
     if "tgl_kejadian" in df.columns:
         df["tgl_kejadian"] = pd.to_datetime(df["tgl_kejadian"], errors="coerce")
@@ -322,6 +324,10 @@ def load_and_process_data(file_path):
         case_cols.append(range_usia_col_name)
     if jam_col_name:
         case_cols.append(jam_col_name)
+    if npp_col_name:
+        case_cols.append(npp_col_name)
+    if perusahaan_col_name:
+        case_cols.append(perusahaan_col_name)
 
     available_case_cols = [col for col in case_cols if col in df.columns]
     
@@ -391,7 +397,7 @@ def load_and_process_data(file_path):
         if "Total_Nominal" in df_grouping.columns:
             df_grouping["Total_Nominal"] = pd.to_numeric(df_grouping["Total_Nominal"], errors="coerce").fillna(0)
 
-    return cases_df, df_grouping, jam_col_name
+    return cases_df, df_grouping, jam_col_name, npp_col_name, perusahaan_col_name
 
 
 file_path = find_excel_file()
@@ -401,7 +407,7 @@ if file_path is None:
 
 try:
     with st.spinner("Memuat dan memproses data..."):
-        cases, df_grouping, jam_col = load_and_process_data(file_path)
+        cases, df_grouping, jam_col, npp_col_name, perusahaan_col_name = load_and_process_data(file_path)
 except Exception as e:
     st.error(f"Gagal membaca file Excel: {e}")
     st.stop()
@@ -1272,11 +1278,12 @@ with tab4:
     st.markdown("### Eksplorasi Data & Detail Kasus JKK")
     st.markdown("Berikut adalah tabel data mentah kasus JKK yang telah difilter sesuai parameter di sidebar.")
     
-    display_cols = [col for col in [
-        "ID Kasus Final", "Kode TK Final", "Nama TK Final", "tgl_kejadian",
+    potential_cols = [
+        npp_col_name, perusahaan_col_name, "Kode TK Final", "Nama TK Final", "tgl_kejadian",
         "Nama Kanwil Pelayanan", "Nama Kantor Pelayanan (Cabang)", "Jenis Kelamin",
         "Range Usia", "Sektor BPS Final", "Nama Lokasi Kecelakaan Final", "Kondisi Akhir", "nom_manfaat_netto"
-    ] if col in filtered.columns]
+    ]
+    display_cols = [col for col in potential_cols if col and col in filtered.columns]
     
     df_explorer = filtered[display_cols].copy()
     if "nom_manfaat_netto" in df_explorer.columns:
