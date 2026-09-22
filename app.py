@@ -974,9 +974,9 @@ with tab3:
         active_filters_list.append(f"Lokus: {', '.join(selected_location)}")
     
     if active_filters_list:
-        profile_filter_text = f"Menampilkan data berdasarkan : {' | '.join(active_filters_list)}"
+        profile_filter_text = f"Menampilkan data berdasarkan : *{' | '.join(active_filters_list)}*"
     else:
-        profile_filter_text = "Menampilkan data secara nasional."
+        profile_filter_text = "*Menampilkan data secara nasional.*"
 
     st.markdown(f"{profile_filter_text}")
 
@@ -1339,6 +1339,14 @@ with tab4:
         filter_status_desc.append(f"Kanwil: {', '.join(selected_kanwil)}")
     if selected_branch:
         filter_status_desc.append(f"Cabang: {', '.join(selected_branch)}")
+    if selected_gender:
+        filter_status_desc.append(f"Jenis Kelamin: {', '.join(selected_gender)}")
+    if selected_sector:
+        filter_status_desc.append(f"Sektor BPS: {', '.join(selected_sector)}")
+    if selected_age_groups:
+        filter_status_desc.append(f"Range Usia: {', '.join(selected_age_groups)}")
+    if selected_location:
+        filter_status_desc.append(f"Lokus: {', '.join(selected_location)}")
     
     if filter_status_desc:
         st.markdown(f"Menampilkan data berdasarkan : *{ ' | '.join(filter_status_desc) }*")
@@ -1368,7 +1376,7 @@ with tab4:
     if "nom_manfaat_netto" in df_explorer.columns:
         df_explorer["nom_manfaat_netto"] = df_explorer["nom_manfaat_netto"].apply(format_currency)
 
-    # Tabel dengan tombol expand/fullscreen aktif secara otomatis di pojok kanan atas oleh Streamlit
+    # Tabel dengan tombol expand/fullscreen aktif secara otomatis di pojok kanan atas oleh Streamlit (berfungsi sempurna saat di-deploy)
     st.dataframe(df_explorer, use_container_width=True, hide_index=True)
     
     csv_data = filtered.to_csv(index=False).encode('utf-8')
