@@ -1265,7 +1265,7 @@ with tab3:
 
     if "Kondisi Akhir" in filtered.columns:
         st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("### Distribusi Kondisi Akhir Pekerja (Funnel Chart)")
+        st.markdown("### Distribusi Kondisi Akhir Pekerja")
         
         cond_data = pd.pivot_table(
             filtered,
