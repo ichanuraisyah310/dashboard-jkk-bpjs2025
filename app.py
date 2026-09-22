@@ -765,14 +765,11 @@ with tab1:
     
     if not selected_kanwil:
         if selected_branch:
-            branch_str = "Cabang: " + ", ".join(selected_branch)
-            st.markdown(f"### Detail Jumlah Kasus, Nominal & Rata-rata | {branch_str}")
+            st.markdown("### Detail Jumlah Kasus, Nominal & Rata-rata")
         else:
             st.markdown("### Detail Jumlah Kasus, Nominal & Rata-rata di Masing-masing Kanwil")
     else:
-        kanwil_str = "Kanwil: " + ", ".join(selected_kanwil)
-        branch_str = f" | Cabang: {', '.join(selected_branch)}" if selected_branch else ""
-        st.markdown(f"### Detail Jumlah Kasus, Nominal & Rata-rata di Masing-masing Cabang | {kanwil_str}{branch_str}")
+        st.markdown("### Detail Jumlah Kasus, Nominal & Rata-rata di Masing-masing Cabang")
 
     if not tab1_source.empty:
         if not selected_kanwil:
@@ -821,9 +818,12 @@ with tab2:
         if selected_location:
             active_filters_list.append(f"Lokus: {', '.join(selected_location)}")
         
-        filter_suffix = f" ({' | '.join(active_filters_list)})" if active_filters_list else ""
+        if active_filters_list:
+            st.markdown(f"Menampilkan data berdasarkan filter aktif: *{ ' | '.join(active_filters_list) }*")
+        else:
+            st.markdown("Menampilkan data secara nasional (seluruh Kanwil karena belum ada filter spesifik yang dipilih).")
 
-        st.markdown(f"### Top 15 Sektor BPS Berdasarkan Jumlah Kasus & Nominal Manfaat{filter_suffix}")
+        st.markdown("### Top 15 Sektor BPS Berdasarkan Jumlah Kasus & Nominal Manfaat")
         
         bps_data = pd.pivot_table(
             filtered,
@@ -1368,7 +1368,7 @@ with tab4:
     if "nom_manfaat_netto" in df_explorer.columns:
         df_explorer["nom_manfaat_netto"] = df_explorer["nom_manfaat_netto"].apply(format_currency)
 
-    # Menampilkan dataframe dengan fitur expander/fullscreen bawaan Streamlit (ikon tombol di pojok kanan atas tabel)
+    # Tabel dengan tombol expand/fullscreen aktif secara otomatis di pojok kanan atas oleh Streamlit
     st.dataframe(df_explorer, use_container_width=True, hide_index=True)
     
     csv_data = filtered.to_csv(index=False).encode('utf-8')
