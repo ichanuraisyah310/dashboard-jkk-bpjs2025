@@ -821,7 +821,7 @@ with tab2:
         if active_filters_list:
             st.markdown(f"Menampilkan data berdasarkan filter aktif: *{ ' | '.join(active_filters_list) }*")
         else:
-            st.markdown("Menampilkan data secara nasional (seluruh Kanwil karena belum ada filter spesifik yang dipilih).")
+            st.markdown("Menampilkan data secara nasional.")
 
         st.markdown("### Top 15 Sektor BPS Berdasarkan Jumlah Kasus & Nominal Manfaat")
         
@@ -976,7 +976,7 @@ with tab3:
     if active_filters_list:
         profile_filter_text = f"Menampilkan data berdasarkan filter aktif: {' | '.join(active_filters_list)}"
     else:
-        profile_filter_text = "Menampilkan data secara nasional (seluruh Kanwil karena belum ada filter spesifik yang dipilih)."
+        profile_filter_text = "Menampilkan data secara nasional."
 
     st.markdown(f"{profile_filter_text}")
 
@@ -1343,7 +1343,7 @@ with tab4:
     if filter_status_desc:
         st.markdown(f"Menampilkan data berdasarkan filter aktif: *{ ' | '.join(filter_status_desc) }*")
     else:
-        st.markdown("Menampilkan data secara nasional (seluruh Kanwil karena belum ada filter spesifik yang dipilih).")
+        st.markdown("Menampilkan data secara nasional.")
     
     potential_cols = [
         npp_col_name, perusahaan_col_name, "Kode TK Final", "Nama TK Final", "tgl_kejadian",
