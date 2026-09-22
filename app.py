@@ -1381,7 +1381,7 @@ with tab4:
     
     csv_data = filtered.to_csv(index=False).encode('utf-8')
     st.download_button(
-        label="📥 Download Data CSV Terfilter",
+        label="📥 Download Data CSV",
         data=csv_data,
         file_name="data_jkk_filtered.csv",
         mime="text/csv"
