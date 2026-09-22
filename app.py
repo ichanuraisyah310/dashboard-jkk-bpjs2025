@@ -819,7 +819,7 @@ with tab2:
             active_filters_list.append(f"Lokus: {', '.join(selected_location)}")
         
         if active_filters_list:
-            st.markdown(f"Menampilkan data berdasarkan filter aktif: *{ ' | '.join(active_filters_list) }*")
+            st.markdown(f"Menampilkan data berdasarkan : *{ ' | '.join(active_filters_list) }*")
         else:
             st.markdown("Menampilkan data secara nasional.")
 
@@ -974,7 +974,7 @@ with tab3:
         active_filters_list.append(f"Lokus: {', '.join(selected_location)}")
     
     if active_filters_list:
-        profile_filter_text = f"Menampilkan data berdasarkan filter aktif: {' | '.join(active_filters_list)}"
+        profile_filter_text = f"Menampilkan data berdasarkan : {' | '.join(active_filters_list)}"
     else:
         profile_filter_text = "Menampilkan data secara nasional."
 
@@ -1341,7 +1341,7 @@ with tab4:
         filter_status_desc.append(f"Cabang: {', '.join(selected_branch)}")
     
     if filter_status_desc:
-        st.markdown(f"Menampilkan data berdasarkan filter aktif: *{ ' | '.join(filter_status_desc) }*")
+        st.markdown(f"Menampilkan data berdasarkan : *{ ' | '.join(filter_status_desc) }*")
     else:
         st.markdown("Menampilkan data secara nasional.")
     
