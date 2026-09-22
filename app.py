@@ -283,7 +283,6 @@ def load_and_process_data(file_path):
     )
     range_usia_col_name = get_col(df, ["Range Usia", "range usia", "range_usia", "usia"])
     
-    # Memastikan penarikan kolom NPP dan Nama Perusahaan Final dari kolom B dan C (indeks 1 dan 2, atau nama kolom eksplisit)
     cols_list = list(df.columns)
     npp_col_name = cols_list[1] if len(cols_list) > 1 else get_col(df, ["NPP", "npp"])
     perusahaan_col_name = cols_list[2] if len(cols_list) > 2 else get_col(df, ["Nama Perusahaan Final", "Nama Perusahaan", "nama perusahaan", "nama_perusahaan"])
@@ -974,16 +973,12 @@ with tab3:
     if selected_location:
         active_filters_list.append(f"Lokus: {', '.join(selected_location)}")
     
-    profile_filter_suffix = f"({', '.join(active_filters_list)})" if active_filters_list else "(Semua Data)"
+    if active_filters_list:
+        profile_filter_text = f"Menampilkan data berdasarkan filter aktif: {' | '.join(active_filters_list)}"
+    else:
+        profile_filter_text = "Menampilkan data secara nasional (seluruh Kanwil karena belum ada filter spesifik yang dipilih)."
 
-    st.markdown(
-        f"""
-        <div style="font-size: 14px; font-weight: 700; color: #1e3a8a; margin-bottom: 25px;">
-            Informasi Filter: {profile_filter_suffix}
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    st.markdown(f"{profile_filter_text}")
 
     if "Range Usia" in filtered.columns:
         st.markdown("### Persentase Distribusi Range Usia Tenaga Kerja")
@@ -1349,10 +1344,7 @@ with tab4:
         st.markdown(f"Menampilkan data berdasarkan filter aktif: *{ ' | '.join(filter_status_desc) }*")
     else:
         st.markdown("Menampilkan data secara nasional (seluruh Kanwil karena belum ada filter spesifik yang dipilih).")
-
-    fullscreen_mode = st.checkbox("🔍 Perlebar Tabel dalam Satu Layar Penuh", value=False)
     
-    # Memasukkan NPP (Kolom B) dan Nama Perusahaan Final (Kolom C) secara eksplisit di awal daftar kolom Case Explorer
     potential_cols = [
         npp_col_name, perusahaan_col_name, "Kode TK Final", "Nama TK Final", "tgl_kejadian",
         jam_col, "Nama Kanwil Pelayanan", "Nama Kantor Pelayanan (Cabang)", "Jenis Kelamin",
@@ -1360,7 +1352,6 @@ with tab4:
         "Nama Lokasi Kecelakaan Final", "Kondisi Akhir", "nom_manfaat_netto"
     ]
     
-    # Menghilangkan duplikasi kolom jika npp_col_name atau perusahaan_col_name sudah ter-cover
     display_cols = []
     seen_cols = set()
     for col in potential_cols:
@@ -1377,11 +1368,8 @@ with tab4:
     if "nom_manfaat_netto" in df_explorer.columns:
         df_explorer["nom_manfaat_netto"] = df_explorer["nom_manfaat_netto"].apply(format_currency)
 
-    if fullscreen_mode:
-        with st.expander("Panel Tampilan Layar Penuh (Expanded)", expanded=True):
-            st.dataframe(df_explorer, use_container_width=True, hide_index=True, height=600)
-    else:
-        st.dataframe(df_explorer, use_container_width=True, hide_index=True)
+    # Menampilkan dataframe dengan fitur expander/fullscreen bawaan Streamlit (ikon tombol di pojok kanan atas tabel)
+    st.dataframe(df_explorer, use_container_width=True, hide_index=True)
     
     csv_data = filtered.to_csv(index=False).encode('utf-8')
     st.download_button(
