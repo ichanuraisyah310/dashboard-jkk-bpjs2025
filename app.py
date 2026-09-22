@@ -65,7 +65,7 @@ def wrap_labels(labels, width=14):
 
 
 # ============================================================
-# CUSTOM CSS (TEXT SELECTION, STYLING & PRINT-TO-PDF FIX)
+# CUSTOM CSS (TEXT SELECTION, STYLING & FULLSCREEN DYNAMIC)
 # ============================================================
 
 st.markdown(
@@ -819,7 +819,7 @@ with tab2:
             active_filters_list.append(f"Lokus: {', '.join(selected_location)}")
         
         if active_filters_list:
-            st.markdown(f"Menampilkan data berdasarkan : *{ ' | '.join(active_filters_list) }*")
+            st.markdown(f"Menampilkan data berdasarkan : { ' | '.join(active_filters_list) }")
         else:
             st.markdown("Menampilkan data secara nasional.")
 
@@ -974,9 +974,9 @@ with tab3:
         active_filters_list.append(f"Lokus: {', '.join(selected_location)}")
     
     if active_filters_list:
-        profile_filter_text = f"Menampilkan data berdasarkan : *{' | '.join(active_filters_list)}*"
+        profile_filter_text = f"Menampilkan data berdasarkan : {' | '.join(active_filters_list)}"
     else:
-        profile_filter_text = "*Menampilkan data secara nasional.*"
+        profile_filter_text = "Menampilkan data secara nasional."
 
     st.markdown(f"{profile_filter_text}")
 
@@ -1349,7 +1349,7 @@ with tab4:
         filter_status_desc.append(f"Lokus: {', '.join(selected_location)}")
     
     if filter_status_desc:
-        st.markdown(f"Menampilkan data berdasarkan : *{ ' | '.join(filter_status_desc) }*")
+        st.markdown(f"Menampilkan data berdasarkan : { ' | '.join(filter_status_desc) }")
     else:
         st.markdown("Menampilkan data secara nasional.")
     
@@ -1376,12 +1376,25 @@ with tab4:
     if "nom_manfaat_netto" in df_explorer.columns:
         df_explorer["nom_manfaat_netto"] = df_explorer["nom_manfaat_netto"].apply(format_currency)
 
-    # Tabel dengan tombol expand/fullscreen aktif secara otomatis di pojok kanan atas oleh Streamlit (berfungsi sempurna saat di-deploy)
-    st.dataframe(df_explorer, use_container_width=True, hide_index=True)
+    # Inisialisasi state untuk Toggle Full Screen Tabel khusus
+    if "is_fullscreen_table" not in st.session_state:
+        st.session_state.is_fullscreen_table = False
+
+    col_btn1, col_btn2 = st.columns([8, 2])
+    with col_btn2:
+        btn_label = "🔍 Perkecil Tabel" if st.session_state.is_fullscreen_table else "🖥️ Full Screen Tabel"
+        if st.button(btn_label, use_container_width=True):
+            st.session_state.is_fullscreen_table = not st.session_state.is_fullscreen_table
+            st.rerun()
+
+    # Tinggi tabel menyesuaikan status toggle (Full screen ~750px, normal ~400px)
+    table_height = 750 if st.session_state.is_fullscreen_table else 400
+
+    st.dataframe(df_explorer, use_container_width=True, height=table_height, hide_index=True)
     
     csv_data = filtered.to_csv(index=False).encode('utf-8')
     st.download_button(
-        label="📥 Download Data CSV",
+        label="📥 Download Data CSV Terfilter",
         data=csv_data,
         file_name="data_jkk_filtered.csv",
         mime="text/csv"
