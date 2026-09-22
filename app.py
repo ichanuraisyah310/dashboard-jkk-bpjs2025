@@ -282,8 +282,11 @@ def load_and_process_data(file_path):
         df, ["Ket Jam Final", "ket_jam_final", "Ket_Jam_Final", "jam_kecelakaan"]
     )
     range_usia_col_name = get_col(df, ["Range Usia", "range usia", "range_usia", "usia"])
-    npp_col_name = get_col(df, ["NPP", "npp"])
-    perusahaan_col_name = get_col(df, ["Nama Perusahaan", "nama perusahaan", "nama_perusahaan"])
+    
+    # Memastikan penarikan kolom NPP dan Nama Perusahaan Final dari kolom B dan C (indeks 1 dan 2, atau nama kolom eksplisit)
+    cols_list = list(df.columns)
+    npp_col_name = cols_list[1] if len(cols_list) > 1 else get_col(df, ["NPP", "npp"])
+    perusahaan_col_name = cols_list[2] if len(cols_list) > 2 else get_col(df, ["Nama Perusahaan Final", "Nama Perusahaan", "nama perusahaan", "nama_perusahaan"])
 
     if "tgl_kejadian" in df.columns:
         df["tgl_kejadian"] = pd.to_datetime(df["tgl_kejadian"], errors="coerce")
@@ -973,7 +976,6 @@ with tab3:
     
     profile_filter_suffix = f"({', '.join(active_filters_list)})" if active_filters_list else "(Semua Data)"
 
-    # Menampilkan judul informasi filter sederhana tanpa background biru
     st.markdown(
         f"""
         <div style="font-size: 14px; font-weight: 700; color: #1e3a8a; margin-bottom: 25px;">
@@ -1336,20 +1338,50 @@ with tab3:
 
 with tab4:
     st.markdown("### Eksplorasi Data & Detail Kasus JKK")
-    st.markdown("Berikut adalah tabel data mentah kasus JKK yang telah difilter sesuai parameter di sidebar.")
     
+    filter_status_desc = []
+    if selected_kanwil:
+        filter_status_desc.append(f"Kanwil: {', '.join(selected_kanwil)}")
+    if selected_branch:
+        filter_status_desc.append(f"Cabang: {', '.join(selected_branch)}")
+    
+    if filter_status_desc:
+        st.markdown(f"Menampilkan data berdasarkan filter aktif: *{ ' | '.join(filter_status_desc) }*")
+    else:
+        st.markdown("Menampilkan data secara nasional (seluruh Kanwil karena belum ada filter spesifik yang dipilih).")
+
+    fullscreen_mode = st.checkbox("🔍 Perlebar Tabel dalam Satu Layar Penuh", value=False)
+    
+    # Memasukkan NPP (Kolom B) dan Nama Perusahaan Final (Kolom C) secara eksplisit di awal daftar kolom Case Explorer
     potential_cols = [
         npp_col_name, perusahaan_col_name, "Kode TK Final", "Nama TK Final", "tgl_kejadian",
-        "Nama Kanwil Pelayanan", "Nama Kantor Pelayanan (Cabang)", "Jenis Kelamin",
-        "Range Usia", "Sektor BPS Final", "Nama Lokasi Kecelakaan Final", "Kondisi Akhir", "nom_manfaat_netto"
+        jam_col, "Nama Kanwil Pelayanan", "Nama Kantor Pelayanan (Cabang)", "Jenis Kelamin",
+        "Range Usia", "Sektor BPS Final", "Nama Sumber Cedera Final", "Nama Bagian Sakit Final", 
+        "Nama Lokasi Kecelakaan Final", "Kondisi Akhir", "nom_manfaat_netto"
     ]
-    display_cols = [col for col in potential_cols if col and col in filtered.columns]
+    
+    # Menghilangkan duplikasi kolom jika npp_col_name atau perusahaan_col_name sudah ter-cover
+    display_cols = []
+    seen_cols = set()
+    for col in potential_cols:
+        if col and col in filtered.columns and col not in seen_cols:
+            display_cols.append(col)
+            seen_cols.add(col)
     
     df_explorer = filtered[display_cols].copy()
+    
+    if "tgl_kejadian" in df_explorer.columns:
+        df_explorer["tgl_kejadian"] = pd.to_datetime(df_explorer["tgl_kejadian"], errors="coerce").dt.strftime("%Y-%m-%d")
+        df_explorer["tgl_kejadian"] = df_explorer["tgl_kejadian"].replace("NaT", "-")
+
     if "nom_manfaat_netto" in df_explorer.columns:
         df_explorer["nom_manfaat_netto"] = df_explorer["nom_manfaat_netto"].apply(format_currency)
-        
-    st.dataframe(df_explorer, use_container_width=True, hide_index=True)
+
+    if fullscreen_mode:
+        with st.expander("Panel Tampilan Layar Penuh (Expanded)", expanded=True):
+            st.dataframe(df_explorer, use_container_width=True, hide_index=True, height=600)
+    else:
+        st.dataframe(df_explorer, use_container_width=True, hide_index=True)
     
     csv_data = filtered.to_csv(index=False).encode('utf-8')
     st.download_button(
